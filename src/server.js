@@ -7,7 +7,7 @@ import {
   countUsers, createUser, deleteUser, getUserById, getUserByUsername, listUsers, updateUser, updateUserPassword,
   createTenant, deleteTenants, getTenant, listTenants, updateTenant,
   getSetting, getSettings, setSetting, updateSettings, getContact, listContacts, markContactRead, setContactPaused, getMessageMedia, getMessages, updateMessageText,
-  createInternalMessage, createInternalNote, deleteInternalNote, ensureOpenConversationCycle,
+  createInternalMessage, createInternalNote, deleteInternalNote, deleteOwnInternalMessage, ensureOpenConversationCycle,
   getInternalMessageMedia, listInternalContacts, listInternalMessages, listInternalNotes,
   resolveConversation, transferConversation,
   listCanned, createCanned, updateCanned, deleteCanned,
@@ -242,6 +242,10 @@ export function createServer() {
       internal_message: (data) => {
         if (Number(data?.tenantId || data?.tenant_id || currentTenantId()) !== req.tenantId) return
         if ([Number(data?.sender_id), Number(data?.recipient_id)].includes(Number(req.user.id))) write('internal_message', data)
+      },
+      internal_message_deleted: (data) => {
+        if (Number(data?.tenantId || data?.tenant_id || currentTenantId()) !== req.tenantId) return
+        if ([Number(data?.sender_id), Number(data?.recipient_id)].includes(Number(req.user.id))) write('internal_message_deleted', data)
       },
     }
     for (const [event, listener] of Object.entries(listeners)) bus.on(event, listener)
@@ -750,6 +754,25 @@ export function createServer() {
     res.type(media.mime_type || 'application/octet-stream')
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(media.file_name || 'audio')}`)
     res.sendFile(absolutePath)
+  })
+  app.delete('/api/internal/messages/:id', auth, (req, res) => {
+    const result = deleteOwnInternalMessage(Number(req.params.id), req.user.id)
+    if (!result.ok) {
+      if (result.reason === 'not_found') return res.status(404).json({ error: 'Mensagem não encontrada.' })
+      if (result.reason === 'forbidden') return res.status(403).json({ error: 'Você só pode apagar suas próprias mensagens.' })
+      return res.status(400).json({ error: 'Só é possível apagar mensagens enviadas há menos de 1 minuto.' })
+    }
+    if (result.message.media_path) {
+      const absolutePath = resolveMediaPath(result.message.media_path, req.tenantId)
+      if (absolutePath) fs.rmSync(absolutePath, { force: true })
+    }
+    bus.emit('internal_message_deleted', {
+      tenantId: req.tenantId,
+      id: result.message.id,
+      sender_id: result.message.sender_id,
+      recipient_id: result.message.recipient_id,
+    })
+    res.json({ ok: true })
   })
 
   // ---------- customer database ----------

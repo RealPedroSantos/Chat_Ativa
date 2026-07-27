@@ -1166,6 +1166,24 @@ export function getInternalMessageMedia(id, currentUserId) {
   `).get(currentTenantId(), Number(id), currentUserId, currentUserId)
 }
 
+const INTERNAL_MESSAGE_DELETE_WINDOW_SECONDS = 60
+
+// Só o próprio remetente pode apagar, e só dentro da janela de 1 minuto — a
+// checagem de "recente" é feita pelo próprio SQLite (datetime('now', ...))
+// para não depender de conversão de fuso horário em JS.
+export function deleteOwnInternalMessage(id, senderId) {
+  const tenantId = currentTenantId()
+  const message = db.prepare('SELECT * FROM internal_messages WHERE tenant_id = ? AND id = ?').get(tenantId, Number(id))
+  if (!message) return { ok: false, reason: 'not_found' }
+  if (Number(message.sender_id) !== Number(senderId)) return { ok: false, reason: 'forbidden' }
+  const fresh = db.prepare(
+    `SELECT 1 FROM internal_messages WHERE id = ? AND created_at >= datetime('now', '-${INTERNAL_MESSAGE_DELETE_WINDOW_SECONDS} seconds')`
+  ).get(Number(id))
+  if (!fresh) return { ok: false, reason: 'expired' }
+  db.prepare('DELETE FROM internal_messages WHERE id = ?').run(Number(id))
+  return { ok: true, message }
+}
+
 export function recordHistoryImport({ jid, importedBy, fileName, messagesImported }) {
   const info = db.prepare(`
     INSERT INTO history_imports (tenant_id, jid, imported_by, file_name, messages_imported)

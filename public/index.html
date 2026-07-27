@@ -276,6 +276,11 @@
               <button type="button" id="chat-record-audio" class="composer-icon secondary" aria-label="Gravar áudio" title="Gravar áudio"><svg class="ui-icon"><use href="icons.svg#i-mic" /></svg></button>
               <input type="text" id="chat-input" placeholder="Digite uma mensagem…" autocomplete="off" />
               <button type="submit" class="chat-send-button">Enviar</button>
+              <div id="chat-audio-preview" class="audio-preview">
+                <button type="button" id="chat-audio-discard" class="icon-button danger" aria-label="Descartar áudio" title="Descartar áudio"><svg class="ui-icon"><use href="icons.svg#i-trash" /></svg></button>
+                <audio id="chat-audio-preview-player" controls preload="metadata"></audio>
+                <button type="button" id="chat-audio-send" class="chat-send-button">Enviar</button>
+              </div>
             </div>
           </form>
         </div>
@@ -305,6 +310,11 @@
             <button type="button" id="internal-record-audio" class="composer-icon secondary" aria-label="Gravar áudio"><svg class="ui-icon"><use href="icons.svg#i-mic" /></svg></button>
             <input id="internal-input" type="text" placeholder="Mensagem para a equipe…" autocomplete="off" />
             <button type="submit">Enviar</button>
+            <div id="internal-audio-preview" class="audio-preview">
+              <button type="button" id="internal-audio-discard" class="icon-button danger" aria-label="Descartar áudio" title="Descartar áudio"><svg class="ui-icon"><use href="icons.svg#i-trash" /></svg></button>
+              <audio id="internal-audio-preview-player" controls preload="metadata"></audio>
+              <button type="button" id="internal-audio-send" class="chat-send-button">Enviar</button>
+            </div>
           </form>
         </div>
       </div>
@@ -696,6 +706,15 @@
     </div>
     <button type="button" id="context-edit-message" role="menuitem">Editar mensagem</button>
     <button type="button" id="context-delete-message" class="context-menu-danger" role="menuitem">Apagar mensagem</button>
+  </div>
+
+  <div id="internal-message-context-menu" class="context-menu hidden" role="menu" aria-label="Opções da mensagem">
+    <div class="context-preview">
+      <span class="context-preview-icon"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-message" /></svg></span>
+      <div><b>Mensagem</b><small id="internal-message-context-preview"></small></div>
+    </div>
+    <button type="button" id="context-copy-internal-message" role="menuitem">Copiar texto</button>
+    <button type="button" id="context-delete-internal-message" class="context-menu-danger" role="menuitem">Apagar mensagem</button>
   </div>
 
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>

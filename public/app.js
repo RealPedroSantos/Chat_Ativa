@@ -580,6 +580,11 @@ function connectEvents() {
     if (otherUserId === Number(currentInternalUserId)) appendInternalMessage(message)
     loadInternalContacts()
   })
+  es.addEventListener('internal_message_deleted', (event) => {
+    const data = JSON.parse(event.data)
+    $(`#internal-messages [data-internal-message-id="${data.id}"]`)?.remove()
+    if (contextInternalMessageId === data.id) closeInternalMessageContextMenu()
+  })
   es.addEventListener('calendar_update', (event) => {
     const update = JSON.parse(event.data)
     if (update.action === 'created') playAppointmentSound()
@@ -1199,6 +1204,7 @@ document.addEventListener('pointerdown', (event) => {
     closeCustomerContextMenu()
     closeItemContextMenu()
     closeMessageContextMenu()
+    closeInternalMessageContextMenu()
   }
 })
 document.addEventListener('keydown', (event) => {
@@ -1207,6 +1213,7 @@ document.addEventListener('keydown', (event) => {
     closeCustomerContextMenu()
     closeItemContextMenu()
     closeMessageContextMenu()
+    closeInternalMessageContextMenu()
   }
 })
 window.addEventListener('blur', () => {
@@ -1516,7 +1523,7 @@ $('#chat-record-audio')?.addEventListener('click', async () => {
     recorder.addEventListener('dataavailable', (event) => {
       if (event.data.size) chunks.push(event.data)
     })
-    recorder.addEventListener('stop', async () => {
+    recorder.addEventListener('stop', () => {
       const actualMime = recorder.mimeType || mimeType || 'audio/webm'
       const shouldDiscard = discardActiveRecording
       discardActiveRecording = false
@@ -1524,10 +1531,7 @@ $('#chat-record-audio')?.addEventListener('click', async () => {
       activeMediaRecorder = null
       if (shouldDiscard) return
       const blob = new Blob(chunks, { type: actualMime })
-      if (blob.size) {
-        const file = new File([blob], recordingFileName(actualMime), { type: actualMime })
-        await uploadChatMedia(file, { voiceNote: true })
-      }
+      if (blob.size) showChatAudioPreview(blob, actualMime)
     }, { once: true })
     recorder.start(250)
     recordingStartedAt = Date.now()
@@ -1546,6 +1550,30 @@ $('#chat-record-audio')?.addEventListener('click', async () => {
     activeMediaRecorder = null
     notify(err.name === 'NotAllowedError' ? 'Permita o uso do microfone para gravar áudio.' : 'Não foi possível iniciar a gravação.', 'error')
   }
+})
+
+let pendingChatAudio = null
+
+function showChatAudioPreview(blob, mime) {
+  pendingChatAudio = { blob, mime, url: URL.createObjectURL(blob) }
+  $('#chat-audio-preview-player').src = pendingChatAudio.url
+  $('.chat-composer')?.classList.add('audio-preview-active')
+}
+
+function hideChatAudioPreview() {
+  if (pendingChatAudio?.url) URL.revokeObjectURL(pendingChatAudio.url)
+  pendingChatAudio = null
+  $('#chat-audio-preview-player').src = ''
+  $('.chat-composer')?.classList.remove('audio-preview-active')
+}
+
+$('#chat-audio-discard').addEventListener('click', hideChatAudioPreview)
+$('#chat-audio-send').addEventListener('click', async () => {
+  const pending = pendingChatAudio
+  if (!pending) return
+  hideChatAudioPreview()
+  const file = new File([pending.blob], recordingFileName(pending.mime), { type: pending.mime })
+  await uploadChatMedia(file, { voiceNote: true })
 })
 
 $('#chat-messages').addEventListener('dragover', (event) => {
@@ -1623,7 +1651,69 @@ function appendInternalMessage(message) {
   item.innerHTML = `<b class="msg-author">${esc(message.sender_name)}</b>${media}${message.text ? `<div class="msg-text">${formatMessageText(message.text)}</div>` : ''}<span class="meta">${esc(message.created_at)}</span>`
   box.appendChild(item)
   box.scrollTop = box.scrollHeight
+  if (mine) attachInternalMessageGestures(item, message)
 }
+
+const INTERNAL_MESSAGE_DELETE_WINDOW_MS = 60 * 1000
+let contextInternalMessageId = null
+let contextInternalMessageElement = null
+
+function canDeleteInternalMessage(message) {
+  if (Number(message.sender_id) !== Number(CURRENT_USER?.id)) return false
+  const sentAt = new Date(String(message.created_at).replace(' ', 'T') + 'Z').getTime()
+  return Number.isFinite(sentAt) && Date.now() - sentAt < INTERNAL_MESSAGE_DELETE_WINDOW_MS
+}
+
+function closeInternalMessageContextMenu() {
+  contextInternalMessageId = null
+  contextInternalMessageElement = null
+  $('#internal-message-context-menu').classList.add('hidden')
+}
+
+function openInternalMessageContextMenu(message, msgEl, clientX, clientY) {
+  contextInternalMessageId = message.id
+  contextInternalMessageElement = msgEl
+  const preview = msgEl.querySelector('.msg-text')?.textContent || msgEl.querySelector('.msg-document b')?.textContent || 'Mensagem'
+  $('#internal-message-context-preview').textContent = preview.length > 60 ? preview.slice(0, 57) + '…' : preview
+  $('#context-copy-internal-message').classList.toggle('hidden', !msgEl.querySelector('.msg-text'))
+  $('#context-delete-internal-message').classList.toggle('hidden', !canDeleteInternalMessage(message))
+  const menu = $('#internal-message-context-menu')
+  menu.classList.remove('hidden')
+  menu.style.left = `${Math.max(8, Math.min(clientX, window.innerWidth - 260))}px`
+  menu.style.top = `${Math.max(8, Math.min(clientY, window.innerHeight - 160))}px`
+  menu.querySelector('button:not(.hidden)')?.focus({ preventScroll: true })
+}
+
+function attachInternalMessageGestures(element, message) {
+  attachForcePress(element, (x, y) => openInternalMessageContextMenu(message, element, x, y))
+}
+
+$('#context-copy-internal-message').addEventListener('click', async () => {
+  const el = contextInternalMessageElement
+  closeInternalMessageContextMenu()
+  const text = el?.querySelector('.msg-text')?.textContent || ''
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    notify('Texto copiado.')
+  } catch {
+    notify('Não foi possível copiar o texto.', 'error')
+  }
+})
+
+$('#context-delete-internal-message').addEventListener('click', async () => {
+  const id = contextInternalMessageId
+  const el = contextInternalMessageElement
+  closeInternalMessageContextMenu()
+  if (!id) return
+  try {
+    await api(`/api/internal/messages/${id}`, { method: 'DELETE' })
+    el?.remove()
+    notify('Mensagem apagada.')
+  } catch (err) {
+    notify(err.message, 'error')
+  }
+})
 
 $('#internal-send-form').addEventListener('submit', async (event) => {
   event.preventDefault()
@@ -1730,16 +1820,11 @@ $('#internal-record-audio').addEventListener('click', async () => {
     recorder.addEventListener('dataavailable', (event) => {
       if (event.data.size) chunks.push(event.data)
     })
-    recorder.addEventListener('stop', async () => {
+    recorder.addEventListener('stop', () => {
       const actualMime = recorder.mimeType || mimeType || 'audio/webm'
       const blob = new Blob(chunks, { type: actualMime })
       stopInternalRecording()
-      if (!blob.size) return
-      try {
-        await uploadInternalMedia(new File([blob], recordingFileName(actualMime), { type: actualMime }), { voiceNote: true })
-      } catch (err) {
-        notify(err.message, 'error')
-      }
+      if (blob.size) showInternalAudioPreview(blob, actualMime)
     }, { once: true })
     recorder.start(250)
     $('#internal-record-audio').classList.add('recording')
@@ -1747,6 +1832,33 @@ $('#internal-record-audio').addEventListener('click', async () => {
   } catch (err) {
     stopInternalRecording()
     notify(err.name === 'NotAllowedError' ? 'Permita o uso do microfone para gravar áudio.' : 'Não foi possível iniciar a gravação.', 'error')
+  }
+})
+
+let pendingInternalAudio = null
+
+function showInternalAudioPreview(blob, mime) {
+  pendingInternalAudio = { blob, mime, url: URL.createObjectURL(blob) }
+  $('#internal-audio-preview-player').src = pendingInternalAudio.url
+  $('#internal-send-form')?.classList.add('audio-preview-active')
+}
+
+function hideInternalAudioPreview() {
+  if (pendingInternalAudio?.url) URL.revokeObjectURL(pendingInternalAudio.url)
+  pendingInternalAudio = null
+  $('#internal-audio-preview-player').src = ''
+  $('#internal-send-form')?.classList.remove('audio-preview-active')
+}
+
+$('#internal-audio-discard').addEventListener('click', hideInternalAudioPreview)
+$('#internal-audio-send').addEventListener('click', async () => {
+  const pending = pendingInternalAudio
+  if (!pending || !currentInternalUserId) return
+  hideInternalAudioPreview()
+  try {
+    await uploadInternalMedia(new File([pending.blob], recordingFileName(pending.mime), { type: pending.mime }), { voiceNote: true })
+  } catch (err) {
+    notify(err.message, 'error')
   }
 })
 
