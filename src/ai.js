@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { getSetting, getMessages, approvedKnowledge, bumpKnowledgeUsage, recordApiUsage } from './db.js'
+import { aiProvider } from './ai-providers.js'
 import {
   calendarContext,
   changeAppointment,
@@ -9,40 +10,68 @@ import {
   getAvailableSlots,
 } from './calendar.js'
 
-// xAI Grok API — OpenAI-compatible endpoint
-const XAI_BASE_URL = 'https://api.x.ai/v1'
+const clients = new Map()
 
-let client = null
-let clientApiKey = null
-
-function getApiKey() {
-  return getSetting('xai_api_key')?.trim() || process.env.XAI_API_KEY?.trim() || ''
+function selectedProvider() {
+  const provider = getSetting('ai_provider')
+  return provider === 'interna' ? 'grok' : provider
 }
 
-export function aiConfigured() {
-  return Boolean(getApiKey())
+function getApiKey(provider = selectedProvider()) {
+  const config = aiProvider(provider)
+  return getSetting(config.apiKeySetting)?.trim() || process.env[config.environmentKey]?.trim() || ''
 }
-function getClient() {
-  const apiKey = getApiKey()
-  if (!apiKey) throw new Error('Chave da API xAI não configurada')
-  if (!client || clientApiKey !== apiKey) {
-    client = new OpenAI({ apiKey, baseURL: XAI_BASE_URL })
-    clientApiKey = apiKey
+
+export function aiConfigured(provider = selectedProvider()) {
+  return Boolean(getApiKey(provider))
+}
+
+export function apiKeySource(provider = selectedProvider()) {
+  const config = aiProvider(provider)
+  if (getSetting(config.apiKeySetting)?.trim()) return 'panel'
+  if (process.env[config.environmentKey]?.trim()) return 'environment'
+  return null
+}
+
+function getClient(provider = selectedProvider()) {
+  const config = aiProvider(provider)
+  const apiKey = getApiKey(provider)
+  if (!apiKey) throw new Error(`Chave da API ${config.name} não configurada`)
+  const cached = clients.get(provider)
+  if (!cached || cached.apiKey !== apiKey) {
+    const options = { apiKey, baseURL: config.baseURL }
+    if (provider === 'openrouter') {
+      options.defaultHeaders = {
+        'HTTP-Referer': process.env.PUBLIC_URL || 'http://localhost:3000',
+        'X-OpenRouter-Title': 'Robô de Atendimento',
+      }
+    }
+    clients.set(provider, { apiKey, client: new OpenAI(options) })
   }
-  return client
+  return clients.get(provider).client
 }
 
-function estimatedTokenCost(model, promptTokens, cachedTokens, completionTokens) {
+function estimatedTokenCost(provider, model, promptTokens, cachedTokens, completionTokens) {
   const name = String(model || '')
-  const rates = name.includes('grok-4.5')
-    ? { input: 2, cached: .5, output: 6 }
-    : { input: 1.25, cached: .2, output: 2.5 }
+  let rates = null
+  if (provider === 'grok') {
+    rates = name.includes('grok-4.5')
+      ? { input: 2, cached: .5, output: 6 }
+      : { input: 1.25, cached: .2, output: 2.5 }
+  } else if (provider === 'gemini') {
+    rates = name.includes('flash-lite')
+      ? { input: .3, cached: .03, output: 2.5 }
+      : { input: 1.5, cached: .15, output: 7.5 }
+  } else if (provider === 'groq' && name === 'llama-3.1-8b-instant') {
+    rates = { input: .05, cached: .05, output: .08 }
+  }
+  if (!rates) return 0
   const multiplier = promptTokens > 200000 ? 2 : 1
   const regularInput = Math.max(0, promptTokens - cachedTokens)
   return ((regularInput * rates.input) + (cachedTokens * rates.cached) + (completionTokens * rates.output)) * multiplier / 1_000_000
 }
 
-function trackUsage(response, purpose, requestedModel) {
+function trackUsage(response, purpose, requestedModel, provider) {
   try {
     const usage = response?.usage
     if (!usage) return
@@ -51,11 +80,16 @@ function trackUsage(response, purpose, requestedModel) {
     const completionTokens = Number(usage.completion_tokens) || 0
     const reasoningTokens = Number(usage.completion_tokens_details?.reasoning_tokens) || 0
     const totalTokens = Number(usage.total_tokens) || (promptTokens + completionTokens)
-    const hasActualCost = usage.cost_in_usd_ticks !== undefined && usage.cost_in_usd_ticks !== null
-    const costUsd = hasActualCost
+    const tickCost = usage.cost_in_usd_ticks !== undefined && usage.cost_in_usd_ticks !== null
       ? Number(usage.cost_in_usd_ticks) / 10_000_000_000
-      : estimatedTokenCost(response.model || requestedModel, promptTokens, cachedTokens, completionTokens)
+      : null
+    const directCost = usage.cost !== undefined && usage.cost !== null ? Number(usage.cost) : null
+    const hasActualCost = tickCost !== null || Number.isFinite(directCost)
+    const costUsd = tickCost ?? (Number.isFinite(directCost)
+      ? directCost
+      : estimatedTokenCost(provider, response.model || requestedModel, promptTokens, cachedTokens, completionTokens))
     recordApiUsage({
+      provider,
       model: response.model || requestedModel,
       purpose,
       promptTokens,
@@ -370,12 +404,13 @@ export async function generateReply(jid, userText, settings, actions = {}) {
   if (history.length === 0) history.push({ role: 'user', content: userText })
 
   const messages = [{ role: 'system', content: system }, ...history]
-  const model = settings.model || 'grok-4.5'
+  const provider = settings.ai_provider || 'grok'
+  const model = settings.model || aiProvider(provider).defaultModel
   const actionState = { sentMessages: new Set() }
   const forceAppointmentCreation = shouldForceAppointmentCreation(history, userText)
   let text = null
   for (let turn = 0; turn < 4; turn++) {
-    const response = await getClient().chat.completions.create({
+    const response = await getClient(provider).chat.completions.create({
       model,
       max_tokens: 1024,
       messages,
@@ -384,7 +419,7 @@ export async function generateReply(jid, userText, settings, actions = {}) {
         ? { type: 'function', function: { name: 'criar_agendamento' } }
         : 'auto',
     })
-    trackUsage(response, turn === 0 ? 'chat_reply' : 'calendar_tool_followup', model)
+    trackUsage(response, turn === 0 ? 'chat_reply' : 'calendar_tool_followup', model, provider)
     const message = response.choices?.[0]?.message
     if (!message) break
     if (!message.tool_calls?.length) {
@@ -413,14 +448,14 @@ export async function generateReply(jid, userText, settings, actions = {}) {
   }
 
   if (!text && messages.at(-1)?.role === 'tool') {
-    const response = await getClient().chat.completions.create({
+    const response = await getClient(provider).chat.completions.create({
       model,
       max_tokens: 1024,
       messages,
       tools: ASSISTANT_TOOLS,
       tool_choice: 'none',
     })
-    trackUsage(response, 'calendar_final_reply', model)
+    trackUsage(response, 'calendar_final_reply', model, provider)
     const candidate = response.choices?.[0]?.message?.content?.trim() || null
     text = candidate && claimsAppointmentConfirmed(candidate) && !hasAppointmentProof(actionState)
       ? UNCONFIRMED_APPOINTMENT_REPLY
@@ -446,8 +481,9 @@ export async function extractQA(transcript, settings) {
     transcript,
   ].join('\n')
 
-  const model = settings.model || 'grok-4.5'
-  const response = await getClient().chat.completions.create({
+  const provider = settings.ai_provider || 'grok'
+  const model = settings.model || aiProvider(provider).defaultModel
+  const response = await getClient(provider).chat.completions.create({
     model,
     max_tokens: 4096,
     messages: [{ role: 'user', content: prompt }],
@@ -479,7 +515,7 @@ export async function extractQA(transcript, settings) {
       },
     },
   })
-  trackUsage(response, 'knowledge_learning', model)
+  trackUsage(response, 'knowledge_learning', model, provider)
 
   const content = response.choices?.[0]?.message?.content
   if (!content) return []
