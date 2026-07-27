@@ -515,9 +515,13 @@ const DEFAULT_SETTINGS = {
   bot_enabled: 'true',
   ai_enabled: 'true',
   learning_enabled: 'true',
-  ai_provider: 'grok', // 'grok' (API xAI) ou 'interna' (IA própria, local)
+  ai_provider: 'grok',
   internal_learning_autoapprove: 'false',
   xai_api_key: '',
+  gemini_api_key: '',
+  groq_api_key: '',
+  mistral_api_key: '',
+  openrouter_api_key: '',
   model: 'grok-4.5',
   max_history: '20',
   business_name: 'Minha Empresa',
@@ -636,21 +640,29 @@ const setGlobalSettingStmt = db.prepare(
   'INSERT INTO global_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
 )
 
+const GLOBAL_SECRET_SETTINGS = new Set([
+  'xai_api_key',
+  'gemini_api_key',
+  'groq_api_key',
+  'mistral_api_key',
+  'openrouter_api_key',
+])
+
 export function getSetting(key) {
-  if (key === 'xai_api_key') return getGlobalSettingStmt.get(key)?.value || ''
+  if (GLOBAL_SECRET_SETTINGS.has(key)) return getGlobalSettingStmt.get(key)?.value || ''
   const row = getSettingStmt.get(currentTenantId(), key)
   return row ? row.value : (DEFAULT_SETTINGS[key] ?? null)
 }
 
 export function setSetting(key, value) {
-  if (key === 'xai_api_key') return setGlobalSettingStmt.run(key, String(value))
+  if (GLOBAL_SECRET_SETTINGS.has(key)) return setGlobalSettingStmt.run(key, String(value))
   setSettingStmt.run(currentTenantId(), key, String(value))
 }
 
 export function getSettings() {
   const out = { ...DEFAULT_SETTINGS }
   for (const row of db.prepare('SELECT key, value FROM settings WHERE tenant_id = ?').all(currentTenantId())) out[row.key] = row.value
-  out.xai_api_key = getSetting('xai_api_key')
+  for (const key of GLOBAL_SECRET_SETTINGS) out[key] = getSetting(key)
   return out
 }
 
@@ -904,9 +916,9 @@ export function createUser({ username, displayName, passwordHash, role = 'attend
   return getUserById(info.lastInsertRowid)
 }
 
-export function updateUser(id, { displayName, role, active }) {
-  db.prepare("UPDATE users SET display_name = ?, role = ?, active = ?, updated_at = datetime('now') WHERE id = ?")
-    .run(String(displayName).trim(), role, active ? 1 : 0, id)
+export function updateUser(id, { username, displayName, role, active }) {
+  db.prepare("UPDATE users SET username = ?, display_name = ?, role = ?, active = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(String(username).trim(), String(displayName).trim(), role, active ? 1 : 0, id)
   return getUserById(id)
 }
 
