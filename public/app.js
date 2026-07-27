@@ -1244,9 +1244,9 @@ function renderMessageMedia(message) {
     return `<video class="msg-media" src="${esc(url)}" ${gifOptions} aria-label="${esc(fileName)}"></video>`
   }
   if (type === 'audio') {
-    return `<div class="msg-audio${message.is_voice_note ? ' voice-note' : ''}"><span aria-hidden="true">${message.is_voice_note ? '🎙️' : '🎵'}</span><audio controls preload="metadata" src="${esc(url)}"></audio></div>`
+    return `<div class="msg-audio${message.is_voice_note ? ' voice-note' : ''}"><span aria-hidden="true"><svg class="ui-icon"><use href="icons.svg#${message.is_voice_note ? 'i-mic' : 'i-music'}" /></svg></span><audio controls preload="metadata" src="${esc(url)}"></audio></div>`
   }
-  return `<a class="msg-document" href="${esc(url)}" target="_blank" rel="noopener" download="${esc(fileName)}"><span class="msg-document-icon" aria-hidden="true">📄</span><span><b>${esc(fileName)}</b><small>${esc(formatFileSize(message.file_size) || 'Arquivo')}</small></span><span aria-hidden="true">⬇</span></a>`
+  return `<a class="msg-document" href="${esc(url)}" target="_blank" rel="noopener" download="${esc(fileName)}"><span class="msg-document-icon" aria-hidden="true"><svg class="ui-icon"><use href="icons.svg#i-file" /></svg></span><span><b>${esc(fileName)}</b><small>${esc(formatFileSize(message.file_size) || 'Arquivo')}</small></span><span class="msg-download-icon" aria-hidden="true"><svg class="ui-icon"><use href="icons.svg#i-download" /></svg></span></a>`
 }
 
 // ---------- message context menu ----------
@@ -1482,7 +1482,7 @@ function stopRecordingUi() {
   const btn = $('#chat-record-audio')
   if (btn) {
     btn.classList.remove('recording')
-    btn.textContent = '🎙️'
+    btn.innerHTML = '<svg class="ui-icon"><use href="icons.svg#i-mic" /></svg>'
     btn.setAttribute('aria-label', 'Gravar áudio')
   }
   activeAudioStream?.getTracks().forEach((track) => track.stop())
@@ -1576,7 +1576,7 @@ function renderInternalContacts() {
   const query = $('#internal-contact-search').value.trim().toLocaleLowerCase('pt-BR')
   const visible = internalContacts.filter((user) => !query || user.display_name.toLocaleLowerCase('pt-BR').includes(query))
   const box = $('#internal-contact-list')
-  box.innerHTML = visible.length ? '' : '<div class="empty-state"><span>👥</span><b>Nenhum usuário encontrado</b><small>Os atendentes e administradores ativos aparecerão aqui.</small></div>'
+  box.innerHTML = visible.length ? '' : '<div class="empty-state"><span><svg class="ui-icon"><use href="icons.svg#i-users" /></svg></span><b>Nenhum usuário encontrado</b><small>Os atendentes e administradores ativos aparecerão aqui.</small></div>'
   for (const user of visible) {
     const item = document.createElement('div')
     item.className = `contact-item${Number(user.id) === Number(currentInternalUserId) ? ' active' : ''}`
@@ -1616,9 +1616,9 @@ function appendInternalMessage(message) {
   } else if (message.has_media && ['video', 'gif'].includes(type)) {
     media = `<video class="msg-media" src="${mediaUrl}" ${type === 'gif' ? 'autoplay loop muted playsinline' : 'controls preload="metadata"'}></video>`
   } else if (message.has_media && type === 'audio') {
-    media = `<div class="msg-audio${message.is_voice_note ? ' voice-note' : ''}"><span aria-hidden="true">🎙️</span><audio controls preload="metadata" src="${mediaUrl}"></audio></div>`
+    media = `<div class="msg-audio${message.is_voice_note ? ' voice-note' : ''}"><span aria-hidden="true"><svg class="ui-icon"><use href="icons.svg#${message.is_voice_note ? 'i-mic' : 'i-music'}" /></svg></span><audio controls preload="metadata" src="${mediaUrl}"></audio></div>`
   } else if (message.has_media) {
-    media = `<a class="msg-document" href="${mediaUrl}" target="_blank" rel="noopener" download="${esc(message.file_name || 'arquivo')}"><span class="msg-document-icon">📄</span><span><b>${esc(message.file_name || 'Arquivo')}</b></span><span>⬇</span></a>`
+    media = `<a class="msg-document" href="${mediaUrl}" target="_blank" rel="noopener" download="${esc(message.file_name || 'arquivo')}"><span class="msg-document-icon"><svg class="ui-icon"><use href="icons.svg#i-file" /></svg></span><span><b>${esc(message.file_name || 'Arquivo')}</b></span><span class="msg-download-icon"><svg class="ui-icon"><use href="icons.svg#i-download" /></svg></span></a>`
   }
   item.innerHTML = `<b class="msg-author">${esc(message.sender_name)}</b>${media}${message.text ? `<div class="msg-text">${formatMessageText(message.text)}</div>` : ''}<span class="meta">${esc(message.created_at)}</span>`
   box.appendChild(item)
@@ -1708,7 +1708,7 @@ function stopInternalRecording() {
   internalMediaRecorder = null
   const button = $('#internal-record-audio')
   button.classList.remove('recording')
-  button.textContent = '🎙️'
+  button.innerHTML = '<svg class="ui-icon"><use href="icons.svg#i-mic" /></svg>'
 }
 
 $('#internal-record-audio').addEventListener('click', async () => {
