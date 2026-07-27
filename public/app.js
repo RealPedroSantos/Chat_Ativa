@@ -2446,8 +2446,12 @@ function renderExceptions(items) {
     div.className = 'exception-item'
     div.innerHTML = `<span><b>${esc(new Date(`${item.date}T12:00:00`).toLocaleDateString('pt-BR'))}</b> · ${item.is_open ? `${esc(item.start_time)}–${esc(item.end_time)}` : 'Fechado'} ${item.note ? `· ${esc(item.note)}` : ''}</span><button class="small danger">Remover</button>`
     const deleteOne = async () => {
-      await api(`/api/calendar/exceptions/${item.date}`, { method: 'DELETE' })
-      loadCalendar()
+      try {
+        await api(`/api/calendar/exceptions/${item.date}`, { method: 'DELETE' })
+        loadCalendar()
+      } catch (err) {
+        notify(err.message, 'error')
+      }
     }
     div.querySelector('button').addEventListener('click', deleteOne)
     wireBulkItem(div, item.date, exceptionBulkController, {
@@ -2520,9 +2524,13 @@ async function loadNotes() {
     })
     const deleteOne = async () => {
       if (!confirm('Excluir esta anotação?')) return
-      await api(`/api/notes/${note.id}`, { method: 'DELETE' })
-      loadNotes()
-      loadNoteCount()
+      try {
+        await api(`/api/notes/${note.id}`, { method: 'DELETE' })
+        loadNotes()
+        loadNoteCount()
+      } catch (err) {
+        notify(err.message, 'error')
+      }
     }
     div.querySelector('[data-act=del]').addEventListener('click', deleteOne)
     wireBulkItem(div, note.id, noteBulkController, {
@@ -2685,8 +2693,14 @@ async function loadUsers() {
   const selectableUsers = users.filter((user) => user.role !== 'super_admin' && user.id !== CURRENT_USER.id)
   userBulkController.setAllKeys(selectableUsers.map((user) => user.id))
   box.innerHTML = users.length ? '' : '<p class="muted">Nenhum usuário cadastrado.</p>'
+  // Espelha a regra do servidor (server.js: "A empresa precisa manter pelo
+  // menos um administrador ativo.") para avisar ANTES do clique, em vez de
+  // deixar o usuário descobrir só depois que a exclusão foi recusada.
+  const activeAdminCount = users.filter((u) => u.role === 'admin' && u.active).length
   for (const user of users) {
     const protectedSuper = user.role === 'super_admin'
+    const lastActiveAdmin = user.role === 'admin' && user.active && activeAdminCount <= 1
+    const canDelete = !protectedSuper && user.id !== CURRENT_USER.id && !lastActiveAdmin
     const div = document.createElement('div')
     div.className = 'item' + (user.active ? '' : ' disabled')
     div.innerHTML = `
@@ -2702,7 +2716,9 @@ async function loadUsers() {
       </div>
       <div class="actions">
         ${protectedSuper ? '<span class="muted">Conta global protegida</span>' : '<button class="small" data-act="save">Salvar</button><button class="small secondary" data-act="password">Trocar senha</button>'}
-        ${!protectedSuper && user.id !== CURRENT_USER.id ? '<button class="small danger" data-act="delete">Excluir</button>' : user.id === CURRENT_USER.id ? '<span class="muted">usuário atual</span>' : ''}
+        ${canDelete ? '<button class="small danger" data-act="delete">Excluir</button>' : ''}
+        ${!canDelete && user.id === CURRENT_USER.id ? '<span class="muted">usuário atual</span>' : ''}
+        ${!canDelete && lastActiveAdmin && user.id !== CURRENT_USER.id ? '<span class="muted" title="A empresa precisa manter pelo menos um administrador ativo.">Único admin ativo — não pode ser excluído</span>' : ''}
       </div>`
     div.querySelector('[data-act=save]')?.addEventListener('click', async () => {
       await api(`/api/users/${user.id}`, {
@@ -2724,8 +2740,12 @@ async function loadUsers() {
     })
     const deleteOne = async () => {
       if (!confirm(`Excluir o usuário ${user.display_name}?`)) return
-      await api(`/api/users/${user.id}`, { method: 'DELETE' })
-      loadUsers()
+      try {
+        await api(`/api/users/${user.id}`, { method: 'DELETE' })
+        loadUsers()
+      } catch (err) {
+        notify(err.message, 'error')
+      }
     }
     div.querySelector('[data-act=delete]')?.addEventListener('click', deleteOne)
     if (!protectedSuper && user.id !== CURRENT_USER.id) {
@@ -2950,9 +2970,12 @@ async function loadCanned() {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
     const deleteOne = async () => {
-      if (confirm('Excluir esta resposta pronta?')) {
+      if (!confirm('Excluir esta resposta pronta?')) return
+      try {
         await api('/api/canned/' + item.id, { method: 'DELETE' })
         loadCanned()
+      } catch (err) {
+        notify(err.message, 'error')
       }
     }
     div.querySelector('[data-act=edit]').addEventListener('click', edit)
@@ -3010,9 +3033,12 @@ async function loadRules() {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
     const deleteOne = async () => {
-      if (confirm('Excluir esta regra?')) {
+      if (!confirm('Excluir esta regra?')) return
+      try {
         await api('/api/rules/' + item.id, { method: 'DELETE' })
         loadRules()
+      } catch (err) {
+        notify(err.message, 'error')
       }
     }
     div.querySelector('[data-act=edit]').addEventListener('click', edit)
@@ -3081,8 +3107,12 @@ async function loadKnowledge() {
     })
     const deleteOne = async () => {
       if (!confirm('Excluir este conhecimento?')) return
-      await api('/api/knowledge/' + item.id, { method: 'DELETE' })
-      loadKnowledge()
+      try {
+        await api('/api/knowledge/' + item.id, { method: 'DELETE' })
+        loadKnowledge()
+      } catch (err) {
+        notify(err.message, 'error')
+      }
     }
     wireBulkItem(div, item.id, knowledgeBulkController, {
       title: item.question,
