@@ -210,7 +210,7 @@ export async function handleIncoming({
     }
   }
 
-  // 3) AI reply — "interna" runs fully local; "grok" calls the xAI API.
+  // 3) AI reply — "interna" runs locally; external providers use their APIs.
   if (settings.ai_enabled === 'true' && (useInternalAi || aiConfigured())) {
     try {
       const reply = useInternalAi ? await generateInternalReply(jid, text, settings) : await generateReply(jid, text, settings, {
