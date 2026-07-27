@@ -3,7 +3,7 @@ import { createServer } from './server.js'
 import { startAllWhatsApps } from './whatsapp.js'
 import { startLearningScheduler } from './learning.js'
 import { aiConfigured } from './ai.js'
-import { countUsers, listTenants } from './db.js'
+import { countUsers, getSetting, listTenants } from './db.js'
 import { runWithTenant } from './tenant-context.js'
 import { syncPromptKnowledge } from './prompt-knowledge.js'
 
@@ -25,8 +25,8 @@ app.listen(PORT, () => {
   console.log(`\n🤖 Robo de Atendimento`)
   console.log(`   Painel: http://localhost:${PORT}`)
   if (countUsers() === 0) console.log('   Primeiro acesso: crie o usuário Super Master no painel')
-  if (!aiConfigured()) {
-    console.log('   ⚠️  Chave da API xAI não configurada — configure-a no painel ou selecione a IA interna (sem custo de API) em Configuração')
+  if (getSetting('ai_provider') !== 'interna' && !aiConfigured()) {
+    console.log('   ⚠️  Chave da API do provedor selecionado não configurada — configure-a no painel ou selecione a IA interna em Configuração')
   }
 })
 

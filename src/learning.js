@@ -22,7 +22,7 @@ function normalizeQ(q) {
 export async function learnFromConversations({ force = false } = {}) {
   const settings = getSettings()
   const internalAi = settings.ai_provider === 'interna'
-  if (!internalAi && !aiConfigured()) return { ok: false, reason: 'chave da API xAI não configurada' }
+  if (!internalAi && !aiConfigured()) return { ok: false, reason: `chave da API ${settings.ai_provider} não configurada` }
   if (!force && settings.learning_enabled !== 'true') return { ok: false, reason: 'aprendizado desativado' }
 
   const since = settings.last_learn_at || new Date(Date.now() - 24 * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ')
