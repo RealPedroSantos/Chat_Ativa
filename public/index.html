@@ -81,7 +81,7 @@
           <div id="conn-status-text">Carregando…</div>
           <div class="qr-frame"><img id="qr-img" class="hidden" alt="QR Code do WhatsApp" /></div>
           <div id="conn-user" class="muted"></div>
-          <div id="ai-warning" class="warn hidden" data-master>Respostas com IA desativadas — em Configurações, selecione a IA interna ou adicione a chave da API xAI.</div>
+          <div id="ai-warning" class="warn hidden" data-master>Respostas com IA desativadas — em Configurações, selecione a IA interna ou adicione a chave do provedor escolhido.</div>
           <button id="btn-logout-wa" class="danger hidden">Desconectar ou trocar número</button>
         </div>
         <aside id="wa-sync-panel" class="card sync-card">
@@ -454,8 +454,12 @@
         </div>
         <label>Provedor de IA
           <select name="ai_provider" id="ai-provider">
-            <option value="interna">IA interna — inteligência própria do robô (local, sem custo de API)</option>
-            <option value="grok">Grok (xAI) — requer chave de API</option>
+            <option value="interna">IA interna</option>
+            <option value="grok">Grok</option>
+            <option value="gemini">Gemini</option>
+            <option value="groq">Groq</option>
+            <option value="mistral">Mistral</option>
+            <option value="openrouter">OpenRouter</option>
           </select>
           <span class="field-help">A IA interna atende com base no prompt de comportamento e nas informações do negócio, aprende com os atendimentos reais e responde de forma humanizada — tudo neste servidor, sem enviar dados para APIs externas.</span>
         </label>
@@ -465,21 +469,69 @@
           <label>Chave da API xAI (Grok)
             <span class="secret-input">
               <input type="password" name="xai_api_key" id="xai-api-key" autocomplete="new-password" placeholder="xai-..." />
-              <button type="button" id="btn-toggle-api-key" class="small secondary">Mostrar</button>
+              <button type="button" class="small secondary btn-toggle-api-key">Mostrar</button>
             </span>
           </label>
-          <p id="api-key-status" class="muted">Verificando configuração…</p>
+          <p class="muted api-key-status" data-key-provider="grok">Verificando configuração…</p>
           <p class="muted">Ainda não tem uma chave? Crie uma no <a href="https://console.x.ai" target="_blank" rel="noreferrer">console da xAI</a>.</p>
           <p class="muted">A chave fica salva somente neste servidor e nunca é exibida novamente. Deixe o campo vazio para manter a chave atual.</p>
-          <button type="button" id="btn-remove-api-key" class="small danger hidden">Remover chave salva</button>
+          <button type="button" class="small danger hidden btn-remove-api-key" data-key-provider="grok">Remover chave salva</button>
         </fieldset>
-        <p class="muted" data-admin-only data-provider="grok">A inteligência artificial é fornecida pela conta central. O consumo desta empresa continua sendo contabilizado separadamente.</p>
-        <label data-provider="grok">Modelo de IA
-          <select name="model">
-            <option value="grok-4.5">Grok 4.5 (mais inteligente)</option>
-            <option value="grok-4.3">Grok 4.3 (equilíbrio)</option>
-            <option value="grok-4.20-0309-non-reasoning">Grok 4.20 non-reasoning (mais rápido/barato)</option>
-          </select>
+        <fieldset class="settings-group" data-super data-provider="gemini">
+          <legend>API da inteligência artificial</legend>
+          <label>Chave da API Gemini
+            <span class="secret-input">
+              <input type="password" name="gemini_api_key" autocomplete="new-password" placeholder="AIza..." />
+              <button type="button" class="small secondary btn-toggle-api-key">Mostrar</button>
+            </span>
+          </label>
+          <p class="muted api-key-status" data-key-provider="gemini">Verificando configuração…</p>
+          <p class="muted">Ainda não tem uma chave? Crie uma grátis no <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">Google AI Studio</a>.</p>
+          <p class="muted">A chave fica salva somente neste servidor e nunca é exibida novamente. Deixe o campo vazio para manter a chave atual.</p>
+          <button type="button" class="small danger hidden btn-remove-api-key" data-key-provider="gemini">Remover chave salva</button>
+        </fieldset>
+        <fieldset class="settings-group" data-super data-provider="groq">
+          <legend>API da inteligência artificial</legend>
+          <label>Chave da API Groq
+            <span class="secret-input">
+              <input type="password" name="groq_api_key" autocomplete="new-password" placeholder="gsk_..." />
+              <button type="button" class="small secondary btn-toggle-api-key">Mostrar</button>
+            </span>
+          </label>
+          <p class="muted api-key-status" data-key-provider="groq">Verificando configuração…</p>
+          <p class="muted">Ainda não tem uma chave? Crie uma no <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">console da Groq</a>.</p>
+          <p class="muted">A chave fica salva somente neste servidor e nunca é exibida novamente. Deixe o campo vazio para manter a chave atual.</p>
+          <button type="button" class="small danger hidden btn-remove-api-key" data-key-provider="groq">Remover chave salva</button>
+        </fieldset>
+        <fieldset class="settings-group" data-super data-provider="mistral">
+          <legend>API da inteligência artificial</legend>
+          <label>Chave da API Mistral
+            <span class="secret-input">
+              <input type="password" name="mistral_api_key" autocomplete="new-password" placeholder="Chave da Mistral" />
+              <button type="button" class="small secondary btn-toggle-api-key">Mostrar</button>
+            </span>
+          </label>
+          <p class="muted api-key-status" data-key-provider="mistral">Verificando configuração…</p>
+          <p class="muted">Ainda não tem uma chave? Crie uma no <a href="https://console.mistral.ai/api-keys" target="_blank" rel="noreferrer">console da Mistral</a>.</p>
+          <p class="muted">A chave fica salva somente neste servidor e nunca é exibida novamente. Deixe o campo vazio para manter a chave atual.</p>
+          <button type="button" class="small danger hidden btn-remove-api-key" data-key-provider="mistral">Remover chave salva</button>
+        </fieldset>
+        <fieldset class="settings-group" data-super data-provider="openrouter">
+          <legend>API da inteligência artificial</legend>
+          <label>Chave da API OpenRouter
+            <span class="secret-input">
+              <input type="password" name="openrouter_api_key" autocomplete="new-password" placeholder="sk-or-v1-..." />
+              <button type="button" class="small secondary btn-toggle-api-key">Mostrar</button>
+            </span>
+          </label>
+          <p class="muted api-key-status" data-key-provider="openrouter">Verificando configuração…</p>
+          <p class="muted">Ainda não tem uma chave? Crie uma no <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noreferrer">OpenRouter</a>.</p>
+          <p class="muted">A chave fica salva somente neste servidor e nunca é exibida novamente. Deixe o campo vazio para manter a chave atual.</p>
+          <button type="button" class="small danger hidden btn-remove-api-key" data-key-provider="openrouter">Remover chave salva</button>
+        </fieldset>
+        <p class="muted" data-admin-only data-provider="grok,gemini,groq,mistral,openrouter">A inteligência artificial é fornecida pela conta central. O consumo desta empresa continua sendo contabilizado separadamente.</p>
+        <label data-provider="grok,gemini,groq,mistral,openrouter">Modelo de IA
+          <select name="model" id="ai-model"></select>
         </label>
         <label>Nome da empresa
           <input type="text" name="business_name" />
