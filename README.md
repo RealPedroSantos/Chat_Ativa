@@ -1,6 +1,6 @@
 # 🤖 Robô de Atendimento — WhatsApp AI Customer Service Bot
 
-A self-hosted WhatsApp customer-service bot with a web dashboard. Connect by scanning a QR code (WhatsApp Web protocol), configure the assistant's behavior, and let it answer customers automatically — with rules, canned responses, and Grok-powered AI replies that **learn from real conversations over time** (with your approval).
+A self-hosted WhatsApp customer-service bot with a web dashboard. Connect by scanning a QR code (WhatsApp Web protocol), configure the assistant's behavior, and let it answer customers automatically — with rules, canned responses, and AI replies that **learn from real conversations over time** (with your approval).
 
 ## Features
 
@@ -9,8 +9,8 @@ A self-hosted WhatsApp customer-service bot with a web dashboard. Connect by sca
 - **Reply pipeline** (in priority order):
   1. **Rules** — pattern matching (contains / exact / starts with / regex) that can reply or **pause the bot** and hand off to a human.
   2. **Canned responses** — keyword-triggered ready-made answers.
-  3. **AI (Grok / xAI)** — answers using your behavior prompt, business info, conversation history, and the approved knowledge base. Never invents facts (guardrails baked in).
-- **Learning loop** — hourly (and on demand), Grok reviews recent conversations and extracts generalizable Q&A pairs. They land as **pending** knowledge; the AI only uses them after you approve them in the dashboard.
+  3. **AI (Internal, Grok, Gemini, Groq, Mistral, or OpenRouter)** — answers using your behavior prompt, business info, conversation history, and the approved knowledge base. Never invents facts (guardrails baked in).
+- **Learning loop** — hourly (and on demand), the selected AI reviews recent conversations and extracts generalizable Q&A pairs. They land as **pending** knowledge; the AI only uses them after you approve them in the dashboard.
 - **Human takeover** — pause the bot per conversation and reply manually from the dashboard.
 - **Auditable service cycles** — attendant identification, assignment, transfer and resolution events while the customer's permanent message history is preserved.
 - **Shared internal notes** — the whole team can coordinate privately inside each customer conversation.
@@ -32,13 +32,13 @@ cp .env.example .env
 npm start
 ```
 
-Open **http://localhost:3000**, add your xAI key under **Configuração → API da inteligência artificial**, then go to **Conexão** and scan the QR code with WhatsApp (phone → Aparelhos conectados → Conectar aparelho). You can create an API key at https://console.x.ai.
+Open **http://localhost:3000**, choose an AI provider and add its key under **Configuração → API da inteligência artificial**, then go to **Conexão** and scan the QR code with WhatsApp (phone → Aparelhos conectados → Conectar aparelho).
 
-The key entered in the dashboard is stored locally in the SQLite database and is never returned to the browser. `XAI_API_KEY` is still supported as an environment-variable fallback. Without either configuration, rules and canned responses still work — only AI replies are disabled.
+Keys entered in the dashboard are stored locally in the SQLite database and are never returned to the browser. `XAI_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, `MISTRAL_API_KEY`, and `OPENROUTER_API_KEY` are supported as environment-variable fallbacks. Without a key for the selected external provider, rules and canned responses still work — only external AI replies are disabled.
 
 ## Configuration tips
 
-- **Configuração → API da inteligência artificial**: add or replace the xAI/Grok API key without editing server files.
+- **Configuração → API da inteligência artificial**: choose the provider and add or replace its API key without editing server files.
 - **Configuração → Prompt de comportamento**: the assistant's persona, tone, and limits.
 - **Configuração → Informações do negócio**: hours, address, prices, policies — the AI only states facts found here or in the approved knowledge base.
 - **Regras**: the seeded example transfers to a human when the customer asks for "atendente/humano". Rules always win over canned responses and AI.
@@ -64,7 +64,7 @@ src/
   index.js      # entry point (server + WhatsApp + learning scheduler)
   whatsapp.js   # Baileys connection, QR code, send/receive
   pipeline.js   # message pipeline: rules → canned → AI
-  ai.js         # Grok API (xAI): replies + knowledge extraction
+  ai.js         # External AI APIs: replies + knowledge extraction
   learning.js   # scheduled learning from conversations
   server.js     # Express API + SSE for the dashboard
   db.js         # SQLite schema and queries
