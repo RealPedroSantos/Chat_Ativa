@@ -26,7 +26,8 @@ import {
 } from './whatsapp.js'
 import { MAX_MEDIA_BYTES, resolveMediaPath, safeFileName } from './media.js'
 import { messageTypeForMedia, saveMediaBuffer } from './media.js'
-import { aiConfigured } from './ai.js'
+import { aiConfigured, apiKeySource } from './ai.js'
+import { AI_PROVIDERS, EXTERNAL_AI_PROVIDERS } from './ai-providers.js'
 import { learnFromHumanReply } from './ai-interna.js'
 import { learnFromConversations } from './learning.js'
 import {
@@ -42,14 +43,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const tokens = new Map()
 
 function publicSettings() {
-  const { xai_api_key: _secret, ...settings } = getSettings()
+  const settings = getSettings()
+  for (const provider of EXTERNAL_AI_PROVIDERS) delete settings[AI_PROVIDERS[provider].apiKeySetting]
   return settings
 }
 
-function apiKeySource() {
-  if (getSetting('xai_api_key')?.trim()) return 'panel'
-  if (process.env.XAI_API_KEY?.trim()) return 'environment'
-  return null
+function aiProviderStatus(superAdmin = false) {
+  return Object.fromEntries(EXTERNAL_AI_PROVIDERS.map((provider) => {
+    const configured = aiConfigured(provider)
+    const source = superAdmin ? apiKeySource(provider) : (configured ? 'central' : null)
+    return [provider, { configured, source }]
+  }))
 }
 
 // AI is ready when the internal engine is selected (no API key needed) or
@@ -209,6 +213,7 @@ export function createServer() {
       tenants: superAdmin ? listTenants() : undefined,
       aiConfigured: manager ? aiReady() : true,
       apiKeySource: superAdmin ? apiKeySource() : (aiConfigured() ? 'central' : null),
+      aiProviderStatus: manager ? aiProviderStatus(superAdmin) : undefined,
       settings: manager ? publicSettings() : undefined,
     })
   })
@@ -347,15 +352,18 @@ export function createServer() {
     const id = Number(req.params.id)
     const current = getUserById(id)
     if (!current || current.tenant_id !== req.tenantId || current.role === 'super_admin') return res.status(404).json({ error: 'Usuário não encontrado.' })
+    const username = normalizeUsername(req.body?.username || current.username)
     const displayName = String(req.body?.displayName || current.display_name).trim()
     const role = req.user.role === 'admin' ? current.role : validRole(req.body?.role || current.role)
     const active = req.body?.active !== false && req.body?.active !== 0
     if (!role || displayName.length < 2) return res.status(400).json({ error: 'Dados do usuário inválidos.' })
+    const existingUsername = getUserByUsername(username)
+    if (existingUsername && existingUsername.id !== id) return res.status(409).json({ error: 'Este nome de usuário já existe.' })
     const activeAdmins = listUsers().filter((item) => item.role === 'admin' && item.active)
     const removesLastAdmin = current.role === 'admin' && current.active && (role !== 'admin' || !active) && activeAdmins.length <= 1
     if (removesLastAdmin) return res.status(400).json({ error: 'A empresa precisa manter pelo menos um administrador ativo.' })
     if (id === req.user.id && !active) return res.status(400).json({ error: 'Você não pode desativar seu próprio usuário.' })
-    res.json(publicUser(updateUser(id, { displayName, role, active })))
+    res.json(publicUser(updateUser(id, { username, displayName, role, active })))
   }))
 
   app.put('/api/users/:id/password', accountAdmin, safe((req, res) => {
@@ -398,21 +406,41 @@ export function createServer() {
   // ---------- settings (account administrators) ----------
   app.put('/api/settings', accountAdmin, (req, res) => {
     const patch = { ...(req.body || {}) }
-    if (req.user.role === 'super_admin' && typeof patch.xai_api_key === 'string') {
-      patch.xai_api_key = patch.xai_api_key.trim()
-      if (!patch.xai_api_key) delete patch.xai_api_key
-    } else delete patch.xai_api_key
+    if (patch.ai_provider && patch.ai_provider !== 'interna' && !AI_PROVIDERS[patch.ai_provider]) {
+      return res.status(400).json({ error: 'Provedor de IA inválido.' })
+    }
+    for (const provider of EXTERNAL_AI_PROVIDERS) {
+      const key = AI_PROVIDERS[provider].apiKeySetting
+      if (req.user.role === 'super_admin' && typeof patch[key] === 'string') {
+        patch[key] = patch[key].trim()
+        if (!patch[key]) delete patch[key]
+      } else delete patch[key]
+    }
     updateSettings(patch)
     const promptKnowledge = syncPromptKnowledge(getSettings())
     if (promptKnowledge.added || promptKnowledge.removed) {
       bus.emit('knowledge_update', { tenantId: req.tenantId, source: 'prompt', ...promptKnowledge })
     }
-    res.json({ ok: true, aiConfigured: aiReady(), apiKeySource: apiKeySource(), settings: publicSettings(), promptKnowledge })
+    res.json({
+      ok: true,
+      aiConfigured: aiReady(),
+      apiKeySource: apiKeySource(),
+      aiProviderStatus: aiProviderStatus(req.user.role === 'super_admin'),
+      settings: publicSettings(),
+      promptKnowledge,
+    })
   })
 
   app.delete('/api/settings/xai-api-key', superOnly, (_req, res) => {
     setSetting('xai_api_key', '')
-    res.json({ ok: true, aiConfigured: aiReady(), apiKeySource: apiKeySource() })
+    res.json({ ok: true, aiConfigured: aiReady(), apiKeySource: apiKeySource(), aiProviderStatus: aiProviderStatus(true) })
+  })
+
+  app.delete('/api/settings/:provider/api-key', superOnly, (req, res) => {
+    const config = AI_PROVIDERS[req.params.provider]
+    if (!config) return res.status(404).json({ error: 'Provedor de IA não encontrado.' })
+    setSetting(config.apiKeySetting, '')
+    res.json({ ok: true, aiConfigured: aiReady(), apiKeySource: apiKeySource(), aiProviderStatus: aiProviderStatus(true) })
   })
 
   // ---------- API usage and costs (isolated by account) ----------
