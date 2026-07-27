@@ -2965,8 +2965,18 @@ function populateAiModels(provider, selectedModel = '') {
 
 function updateAiProviderUi(selectedModel = '') {
   const provider = $('#ai-provider').value || 'grok'
+  const superAdmin = CURRENT_USER?.role === 'super_admin'
+  const manager = ['super_admin', 'admin'].includes(CURRENT_USER?.role)
+  // O toggle por provedor não pode sobrepor as permissões por papel já
+  // aplicadas em applyPermissions() — só a conta Super Master edita a chave
+  // (data-super); administradores de empresa só veem o aviso de conta
+  // central (data-admin-only). Ambos compartilham data-provider, então
+  // precisam ser combinados aqui, não decididos isoladamente.
   document.querySelectorAll('[data-provider]').forEach((element) => {
-    element.classList.toggle('hidden', !element.dataset.provider.split(',').includes(provider))
+    let visible = element.dataset.provider.split(',').includes(provider)
+    if (element.hasAttribute('data-super')) visible = visible && superAdmin
+    if (element.hasAttribute('data-admin-only')) visible = visible && manager && !superAdmin
+    element.classList.toggle('hidden', !visible)
   })
   populateAiModels(provider, selectedModel)
   $('#ai-warning').classList.toggle('hidden', provider === 'interna' || Boolean(aiProviderStatus[provider]?.configured))
