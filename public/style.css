@@ -220,6 +220,22 @@ textarea { min-height: 86px; resize: vertical; line-height: 1.5; }
 input::placeholder, textarea::placeholder { color: #98a2b3; }
 input:hover, textarea:hover, select:hover { border-color: #bdc6d2; }
 input:focus, textarea:focus, select:focus { border-color: #087a65; box-shadow: none; outline: 2px solid #9fd6ca; outline-offset: 1px; }
+
+/* Selects usam a mesma caixa dos inputs de texto; sem isto, cada navegador
+   desenha sua própria seta e "chrome" nativos por cima, destoando do resto
+   do formulário (ver Usuários → Permissão). */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  cursor: pointer;
+}
+select:disabled { cursor: not-allowed; }
 label { display: block; margin-bottom: 14px; color: #344054; font-size: 12px; font-weight: 650; }
 label.check { display: inline-flex; align-items: center; gap: 8px; font-weight: 550; }
 label.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--primary); }
@@ -326,7 +342,7 @@ label.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--pr
 #chat-contact-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #chat-register-customer { margin-left: auto; white-space: nowrap; }
 .chat-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; }
-.chat-header-actions select { width: auto; max-width: 180px; height: 34px; margin: 0; padding-block: 4px; font-size: 10px; }
+.chat-header-actions select { width: auto; max-width: 180px; height: 34px; margin: 0; padding-block: 4px; padding-right: 28px; background-position: right 8px center; background-size: 12px; font-size: 10px; }
 .chat-internal-notes { padding: 12px 16px; border-bottom: 1px solid #eedba8; background: #fffaf0; }
 .chat-notes-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .chat-notes-head b, .chat-notes-head small { display: block; }
@@ -390,6 +406,7 @@ label.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--pr
 .manual-history-import p { font-size: 9px; line-height: 1.5; }
 .manual-history-import label { margin-top: 7px; font-size: 9px; }
 .manual-history-import input, .manual-history-import select { height: 36px; margin-top: 3px; font-size: 10px; }
+.manual-history-import select { padding-right: 28px; background-position: right 8px center; background-size: 12px; }
 .manual-history-import button { width: 100%; margin-top: 8px; }
 #history-import-result { display: block; margin-top: 7px; }
 
@@ -582,7 +599,17 @@ label.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--pr
 .toast.error { border-color: #f2c2c2; color: #9f3030; }
 .toast.success { border-color: #bfe7d8; color: #087454; }
 .tenant-switcher { display: flex; align-items: center; gap: 7px; color: #c9d6e5; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
-.tenant-switcher select { min-width: 170px; padding: 8px 30px 8px 10px; border-color: rgba(255,255,255,.2); color: #fff; background-color: rgba(255,255,255,.1); font-size: 12px; text-transform: none; letter-spacing: 0; }
+.tenant-switcher select {
+  min-width: 170px;
+  padding: 8px 30px 8px 10px;
+  border-color: rgba(255,255,255,.2);
+  color: #fff;
+  background-color: rgba(255,255,255,.1);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+}
 .tenant-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 18px; }
 .tenant-card { margin: 0; }
 .tenant-card.disabled { opacity: .7; }
