@@ -3061,8 +3061,17 @@ async function init() {
 }
 
 ;(async () => {
-  const status = await fetch('/api/auth-status', { headers: TOKEN ? { 'x-auth-token': TOKEN } : {} }).then((r) => r.json())
-  if (status.setupRequired) showLogin('setup')
-  else if (!status.user) showLogin('login')
-  else init()
+  try {
+    const response = await fetch('/api/auth-status', { headers: TOKEN ? { 'x-auth-token': TOKEN } : {} })
+    if (!response.ok) throw new Error(`Servidor indisponível (${response.status})`)
+    const status = await response.json()
+    if (status.setupRequired) showLogin('setup')
+    else if (!status.user) showLogin('login')
+    else init()
+  } catch (err) {
+    showLogin('login')
+    $('#login-error').textContent = 'O painel web está publicado, mas o servidor permanente do WhatsApp ainda não foi conectado.'
+    $('#login-form button[type="submit"]').disabled = true
+    console.error(err)
+  }
 })()
