@@ -2696,6 +2696,7 @@ async function loadUsers() {
       </div>
       <div class="row compact user-controls">
         <label>Nome<input type="text" data-field="name" value="${esc(user.display_name)}" ${protectedSuper ? 'disabled' : ''} /></label>
+        <label>Usuário<input type="text" data-field="username" value="${esc(user.username)}" autocomplete="username" ${protectedSuper ? 'disabled' : ''} /></label>
         <label>Permissão<select data-field="role" ${CURRENT_USER.role === 'admin' || protectedSuper ? 'disabled' : ''}><option value="attendant" ${user.role === 'attendant' ? 'selected' : ''}>Atendente</option><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option><option value="super_admin" ${protectedSuper ? 'selected' : ''}>Super Master</option></select></label>
         <label class="check"><input type="checkbox" data-field="active" ${user.active ? 'checked' : ''} ${protectedSuper ? 'disabled' : ''} /> Ativo</label>
       </div>
@@ -2707,6 +2708,7 @@ async function loadUsers() {
       await api(`/api/users/${user.id}`, {
         method: 'PUT',
         body: JSON.stringify({
+          username: div.querySelector('[data-field=username]').value,
           displayName: div.querySelector('[data-field=name]').value,
           role: div.querySelector('[data-field=role]').value,
           active: div.querySelector('[data-field=active]').checked,
@@ -2752,40 +2754,115 @@ $('#user-form').addEventListener('submit', async (e) => {
 
 /* ---------- settings ---------- */
 
-function renderAiConfigured(configured, source = null) {
-  $('#ai-warning').classList.toggle('hidden', configured)
-  $('#api-key-status').textContent = !configured
-    ? 'Nenhuma chave configurada. As respostas com IA estão desativadas.'
-    : source === 'environment'
-      ? 'API configurada pela variável de ambiente XAI_API_KEY.'
-      : source === 'central'
-        ? 'IA central ativa. O consumo desta empresa é contabilizado separadamente.'
-        : 'API configurada pelo painel do Super Master.'
-  $('#api-key-status').className = configured ? 'ok' : 'warn'
-  $('#btn-remove-api-key').classList.toggle('hidden', source !== 'panel')
+const AI_PROVIDER_DETAILS = {
+  grok: {
+    name: 'Grok',
+    environmentKey: 'XAI_API_KEY',
+    models: [
+      ['grok-4.5', 'Grok 4.5'],
+      ['grok-4.3', 'Grok 4.3'],
+      ['grok-4.20-0309-non-reasoning', 'Grok 4.20 non-reasoning'],
+    ],
+  },
+  gemini: {
+    name: 'Gemini',
+    environmentKey: 'GEMINI_API_KEY',
+    models: [
+      ['gemini-3.6-flash', 'Gemini 3.6 Flash'],
+      ['gemini-3.5-flash-lite', 'Gemini 3.5 Flash-Lite'],
+    ],
+  },
+  groq: {
+    name: 'Groq',
+    environmentKey: 'GROQ_API_KEY',
+    models: [
+      ['openai/gpt-oss-120b', 'GPT-OSS 120B'],
+      ['llama-3.1-8b-instant', 'Llama 3.1 8B Instant'],
+    ],
+  },
+  mistral: {
+    name: 'Mistral',
+    environmentKey: 'MISTRAL_API_KEY',
+    models: [
+      ['mistral-small-latest', 'Mistral Small'],
+      ['mistral-large-latest', 'Mistral Large'],
+    ],
+  },
+  openrouter: {
+    name: 'OpenRouter',
+    environmentKey: 'OPENROUTER_API_KEY',
+    models: [
+      ['openrouter/free', 'Modelos gratuitos'],
+      ['openrouter/auto', 'Seleção automática'],
+    ],
+  },
 }
 
-function updateAiProviderUi() {
-  const provider = $('#ai-provider').value || 'grok'
-  document.querySelectorAll('[data-provider]').forEach((element) => {
-    element.classList.toggle('hidden', element.dataset.provider !== provider)
+let aiProviderStatus = {}
+
+function renderAiConfigured(configured, source = null, providerStatus = null) {
+  if (providerStatus) aiProviderStatus = providerStatus
+  $('#ai-warning').classList.toggle('hidden', configured)
+  document.querySelectorAll('.api-key-status').forEach((element) => {
+    const provider = element.dataset.keyProvider
+    const details = AI_PROVIDER_DETAILS[provider]
+    const status = aiProviderStatus[provider] || {
+      configured: provider === $('#ai-provider').value ? configured : false,
+      source: provider === $('#ai-provider').value ? source : null,
+    }
+    element.textContent = !status.configured
+      ? `Nenhuma chave ${details.name} configurada.`
+      : status.source === 'environment'
+        ? `API configurada pela variável de ambiente ${details.environmentKey}.`
+        : status.source === 'central'
+          ? 'IA central ativa. O consumo desta empresa é contabilizado separadamente.'
+          : 'API configurada pelo painel do Super Master.'
+    element.className = `api-key-status ${status.configured ? 'ok' : 'warn'}`
+  })
+  document.querySelectorAll('.btn-remove-api-key').forEach((button) => {
+    button.classList.toggle('hidden', aiProviderStatus[button.dataset.keyProvider]?.source !== 'panel')
   })
 }
 
+function populateAiModels(provider, selectedModel = '') {
+  const select = $('#ai-model')
+  const models = AI_PROVIDER_DETAILS[provider]?.models || []
+  select.innerHTML = models.map(([value, label]) => `<option value="${esc(value)}">${esc(label)}</option>`).join('')
+  select.value = models.some(([value]) => value === selectedModel) ? selectedModel : (models[0]?.[0] || '')
+}
+
+function updateAiProviderUi(selectedModel = '') {
+  const provider = $('#ai-provider').value || 'grok'
+  document.querySelectorAll('[data-provider]').forEach((element) => {
+    element.classList.toggle('hidden', !element.dataset.provider.split(',').includes(provider))
+  })
+  populateAiModels(provider, selectedModel)
+  $('#ai-warning').classList.toggle('hidden', provider === 'interna' || Boolean(aiProviderStatus[provider]?.configured))
+}
+
 async function loadSettings() {
-  const { settings, aiConfigured, apiKeySource } = await api('/api/state')
+  const { settings, aiConfigured, apiKeySource, aiProviderStatus: providerStatus } = await api('/api/state')
   const form = $('#settings-form')
+  $('#ai-provider').value = settings.ai_provider || 'grok'
+  updateAiProviderUi(settings.model)
   for (const el of form.elements) {
     if (!el.name || !(el.name in settings)) continue
     if (el.type === 'checkbox') el.checked = settings[el.name] === 'true'
     else el.value = settings[el.name]
   }
-  $('#xai-api-key').value = ''
-  updateAiProviderUi()
-  renderAiConfigured(aiConfigured, apiKeySource)
+  clearApiKeyInputs(form)
+  renderAiConfigured(aiConfigured, apiKeySource, providerStatus)
 }
 
-$('#ai-provider').addEventListener('change', updateAiProviderUi)
+$('#ai-provider').addEventListener('change', () => updateAiProviderUi())
+
+function clearApiKeyInputs(form = $('#settings-form')) {
+  form.querySelectorAll('.secret-input input').forEach((input) => {
+    input.value = ''
+    input.type = 'password'
+  })
+  form.querySelectorAll('.btn-toggle-api-key').forEach((button) => { button.textContent = 'Mostrar' })
+}
 
 $('#settings-form').addEventListener('submit', async (e) => {
   e.preventDefault()
@@ -2796,26 +2873,34 @@ $('#settings-form').addEventListener('submit', async (e) => {
     patch[el.name] = el.type === 'checkbox' ? String(el.checked) : el.value
   }
   const result = await api('/api/settings', { method: 'PUT', body: JSON.stringify(patch) })
-  $('#xai-api-key').value = ''
-  renderAiConfigured(result.aiConfigured, result.apiKeySource)
+  clearApiKeyInputs(form)
+  renderAiConfigured(result.aiConfigured, result.apiKeySource, result.aiProviderStatus)
   $('#settings-saved').classList.remove('hidden')
   const learned = Number(result.promptKnowledge?.added || 0)
   notify(learned ? `Configurações salvas. ${learned} conhecimento(s) criado(s) do prompt.` : 'Configurações salvas.')
   setTimeout(() => $('#settings-saved').classList.add('hidden'), 2000)
 })
 
-$('#btn-toggle-api-key').addEventListener('click', () => {
-  const input = $('#xai-api-key')
-  const visible = input.type === 'text'
-  input.type = visible ? 'password' : 'text'
-  $('#btn-toggle-api-key').textContent = visible ? 'Mostrar' : 'Ocultar'
+document.querySelectorAll('.btn-toggle-api-key').forEach((button) => {
+  button.addEventListener('click', () => {
+    const input = button.closest('.secret-input').querySelector('input')
+    const visible = input.type === 'text'
+    input.type = visible ? 'password' : 'text'
+    button.textContent = visible ? 'Mostrar' : 'Ocultar'
+  })
 })
 
-$('#btn-remove-api-key').addEventListener('click', async () => {
-  if (!confirm('Remover a chave da API salva pelo painel?')) return
-  const result = await api('/api/settings/xai-api-key', { method: 'DELETE' })
-  $('#xai-api-key').value = ''
-  renderAiConfigured(result.aiConfigured, result.apiKeySource)
+document.querySelectorAll('.btn-remove-api-key').forEach((button) => {
+  button.addEventListener('click', async () => {
+    const provider = button.dataset.keyProvider
+    if (!confirm(`Remover a chave da API ${AI_PROVIDER_DETAILS[provider].name} salva pelo painel?`)) return
+    const result = await api(`/api/settings/${provider}/api-key`, { method: 'DELETE' })
+    const input = button.closest('fieldset').querySelector('.secret-input input')
+    input.value = ''
+    input.type = 'password'
+    button.closest('fieldset').querySelector('.btn-toggle-api-key').textContent = 'Mostrar'
+    renderAiConfigured(result.aiConfigured, result.apiKeySource, result.aiProviderStatus)
+  })
 })
 
 /* ---------- generic CRUD builders ---------- */
