@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b1220" />
+  <title>atnva.ia | Atendimento inteligente</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Login overlay -->
+  <div id="login-overlay" class="hidden">
+    <form id="login-form" class="card auth-card">
+      <img class="auth-logo" src="logo-atnva.png" alt="atnva.ia" />
+      <h2>Acesse sua central</h2>
+      <p>Entre com seu usuário e senha.</p>
+      <input type="text" id="login-username" placeholder="Usuário" autocomplete="username" required />
+      <input type="password" id="login-password" placeholder="Senha" autofocus />
+      <button type="submit">Entrar</button>
+      <p id="login-error" class="error"></p>
+    </form>
+    <form id="setup-form" class="card auth-card hidden">
+      <img class="auth-logo" src="logo-atnva.png" alt="atnva.ia" />
+      <h2>Criar Super Master</h2>
+      <p>Primeiro acesso: crie a conta que administrará todas as empresas do sistema.</p>
+      <input type="text" id="setup-display-name" placeholder="Seu nome" required />
+      <input type="text" id="setup-username" placeholder="Usuário (ex.: master)" autocomplete="username" required />
+      <input type="password" id="setup-password" placeholder="Senha com pelo menos 8 caracteres" autocomplete="new-password" required />
+      <input type="password" id="setup-password-confirm" placeholder="Confirmar senha" autocomplete="new-password" required />
+      <button type="submit">Criar Super Master e entrar</button>
+      <p id="setup-error" class="error"></p>
+    </form>
+  </div>
+
+  <header class="app-header">
+    <div class="brand">
+      <h1 class="sr-only">atnva.ia</h1>
+      <img class="brand-logo" src="logo-atnva.png" alt="" aria-hidden="true" />
+      <span class="brand-divider" aria-hidden="true"></span>
+      <p>Central inteligente</p>
+    </div>
+    <div class="header-actions">
+      <label id="tenant-switcher-wrap" class="tenant-switcher hidden" data-super>Empresa
+        <select id="tenant-switcher" aria-label="Empresa ativa"></select>
+      </label>
+      <span id="current-user" class="current-user"></span>
+      <button id="btn-calendar-sound" class="small header-button icon-button" type="button" aria-label="Desativar alertas sonoros" aria-pressed="true" title="Alertas sonoros ativados"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-volume" /></svg></button>
+      <button id="btn-logout" class="small header-button hidden" title="Encerrar sessão">Sair</button>
+      <div id="conn-badge" class="badge off">desconectado</div>
+    </div>
+  </header>
+
+  <nav id="tabs" aria-label="Navegação principal">
+    <span class="nav-section">Operação</span>
+    <button data-tab="connection" data-master><svg class="nav-icon" aria-hidden="true"><use href="icons.svg#i-link" /></svg><span>Conexão</span></button>
+    <button data-tab="chats" class="active"><svg class="nav-icon" aria-hidden="true"><use href="icons.svg#i-message" /></svg><span>Conversas</span></button>
+    <button data-tab="internal"><svg class="nav-icon" aria-hidden="true"><use href="icons.svg#i-users" /></svg><span>Comunicação interna</span></button>
+    <button data-tab="calendar"><svg class="nav-icon" aria-hidden="true"><use href="icons.svg#i-calendar" /></svg><span>Calendário</span><span id="calendar-count" class="tab-count hidden"></span></button>
+    <button data-tab="customers"><svg class="nav-icon" aria-hidden="true"><use href="icons.svg#i-users" /></svg><span>Clientes</span></button>
+    <button data-tab="notes"><svg class="nav-icon" aria-hidden="true"><use href="icons.svg#i-note" /></svg><span>Notas inteligentes</span><span id="notes-count" class="tab-count hidden"></span></button>
+    <span class="nav-section" data-master>Gestão</span>
+    <button data-tab="companies" data-super><svg class="nav-icon" aria-hidden="true"><use href="icons.svg#i-users" /></svg><span>Empresas</span></button>
+    <button data-tab="settings" data-master><svg class="nav-icon" aria-hidden="true"><use href="icons.svg#i-settings" /></svg><span>Configurações</span></button>
+    <button data-tab="canned" data-master><svg class="nav-icon" aria-hidden="true"><use href="icons.svg#i-template" /></svg><span>Respostas prontas</span></button>
+    <button data-tab="rules" data-master><svg class="nav-icon" aria-hidden="true"><use href="icons.svg#i-rules" /></svg><span>Regras</span></button>
+    <button data-tab="knowledge" data-master><svg class="nav-icon" aria-hidden="true"><use href="icons.svg#i-book" /></svg><span>Conhecimento</span></button>
+    <button data-tab="usage" data-master><svg class="nav-icon" aria-hidden="true"><use href="icons.svg#i-chart" /></svg><span>Consumo da API</span></button>
+    <button data-tab="users" data-master><svg class="nav-icon" aria-hidden="true"><use href="icons.svg#i-users" /></svg><span>Usuários</span></button>
+  </nav>
+
+  <main>
+    <!-- Connection -->
+    <section id="tab-connection" class="tab" data-master>
+      <div class="page-heading">
+        <div><span class="eyebrow">Canal de atendimento</span><h2>Conexão do WhatsApp</h2><p>Conecte sua conta e traga contatos e conversas anteriores para começar com todo o contexto.</p></div>
+      </div>
+      <div class="connection-layout">
+        <div class="card center connection-hero">
+          <div class="connection-orb" aria-hidden="true"><svg class="ui-icon"><use href="icons.svg#i-link" /></svg></div>
+          <span id="conn-kicker" class="status-kicker">Verificando conexão</span>
+          <div id="conn-status-text">Carregando…</div>
+          <div class="qr-frame"><img id="qr-img" class="hidden" alt="QR Code do WhatsApp" /></div>
+          <div id="conn-user" class="muted"></div>
+          <div id="ai-warning" class="warn hidden" data-master>Respostas com IA desativadas — em Configurações, selecione a IA interna ou adicione a chave da API xAI.</div>
+          <button id="btn-logout-wa" class="danger hidden">Desconectar ou trocar número</button>
+        </div>
+        <aside id="wa-sync-panel" class="card sync-card">
+          <span class="eyebrow">Importação inteligente</span>
+          <h3>Comece com seu histórico</h3>
+          <p>Depois de ler o QR Code, copie os contatos salvos e, se desejar, as conversas antigas. Informações extras no nome serão separadas automaticamente no cadastro.</p>
+          <div class="sync-flow" aria-label="Etapas da sincronização">
+            <div><span>1</span><b>Conectar</b><small>Leia o QR Code</small></div>
+            <div><span>2</span><b>Sincronizar</b><small>Contatos e histórico</small></div>
+            <div><span>3</span><b>Revisar</b><small>Dados organizados</small></div>
+          </div>
+          <label class="sync-option"><input id="wa-sync-history" type="checkbox" checked /><span><b>Incluir conversas antigas</b><small>Importa mensagens e mídias disponíveis no histórico do aparelho principal.</small></span></label>
+          <button type="button" id="btn-sync-wa" disabled>Sincronizar agora</button>
+          <div id="wa-sync-status" class="sync-status" aria-live="polite">
+            <div class="sync-progress"><span id="wa-sync-progress-bar"></span></div>
+            <p id="wa-sync-status-text">Conecte o WhatsApp para liberar a sincronização.</p>
+            <div class="sync-metrics">
+              <span><b id="sync-contacts">0</b> contatos</span>
+              <span><b id="sync-customers">0</b> novos clientes</span>
+              <span><b id="sync-messages">0</b> mensagens</span>
+            </div>
+          </div>
+          <p class="sync-privacy"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-check" /></svg> Os dados só entram no sistema após sua autorização.</p>
+          <details class="manual-history-import">
+            <summary>Importar histórico exportado do aplicativo</summary>
+            <p>Use o arquivo <b>.txt</b> criado em WhatsApp → Mais → Exportar conversa.</p>
+            <label>Conversa
+              <select id="history-import-contact"><option value="">Selecione um contato</option></select>
+            </label>
+            <label>Seus nomes no arquivo
+              <input id="history-import-own-names" type="text" placeholder="Ex.: Pedro Santos, Empresa" />
+            </label>
+            <input id="history-import-file" type="file" accept=".txt,text/plain" />
+            <button id="btn-import-history" type="button" class="secondary">Importar arquivo</button>
+            <small id="history-import-result" class="muted"></small>
+          </details>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Intelligent calendar -->
+    <section id="tab-calendar" class="tab">
+      <div class="card calendar-toolbar">
+        <div class="calendar-navigation">
+          <button type="button" id="calendar-prev" class="small secondary icon-button" aria-label="Mês anterior"><svg class="ui-icon"><use href="icons.svg#i-chevron-left" /></svg></button>
+          <button type="button" id="calendar-today" class="small secondary">Hoje</button>
+          <button type="button" id="calendar-next" class="small secondary icon-button" aria-label="Próximo mês"><svg class="ui-icon"><use href="icons.svg#i-chevron-right" /></svg></button>
+        </div>
+        <h3 id="calendar-month-title">Calendário</h3>
+        <div class="calendar-legend"><span class="dot ai"></span> IA <span class="dot manual"></span> Atendente</div>
+      </div>
+      <div class="calendar-layout">
+        <div class="card calendar-main">
+          <div class="calendar-weekdays">
+            <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+          </div>
+          <div id="calendar-grid" class="calendar-grid"></div>
+        </div>
+        <aside class="card calendar-side">
+          <h3 id="calendar-day-title">Agenda do dia</h3>
+          <p class="calendar-tip">Arraste um evento para trocar o dia ou solte-o sobre um horário livre. Clique no evento para editar ou excluir.</p>
+          <div id="day-availability" class="availability-summary"></div>
+          <div id="day-appointments"></div>
+          <hr />
+          <h4>Novo agendamento</h4>
+          <form id="appointment-form">
+            <input type="hidden" name="id" />
+            <label>Nome do cliente <input type="text" name="customerName" required /></label>
+            <label>Telefone com DDD <input type="text" name="jid" placeholder="5521999999999" /></label>
+            <label>Motivo <input type="text" name="title" required placeholder="Visita, consulta, reunião…" /></label>
+            <div class="row compact">
+              <label>Data <input type="date" name="date" required /></label>
+              <label>Horário <select name="time" required><option value="">Selecione</option></select></label>
+            </div>
+            <label>Duração
+              <select name="duration">
+                <option value="30">30 minutos</option>
+                <option value="60" selected>1 hora</option>
+                <option value="90">1h30</option>
+                <option value="120">2 horas</option>
+              </select>
+            </label>
+            <label>Observações <textarea name="notes" rows="2"></textarea></label>
+            <button type="submit">Salvar agendamento</button>
+            <button type="button" id="appointment-cancel-edit" class="secondary hidden">Cancelar edição</button>
+            <p id="appointment-result" class="muted"></p>
+          </form>
+        </aside>
+      </div>
+
+      <details class="card calendar-settings">
+        <summary><b>Disponibilidade e dias especiais</b></summary>
+        <p class="muted">A IA consulta estes horários antes de oferecer ou confirmar um agendamento.</p>
+        <h4>Horários semanais</h4>
+        <div id="weekly-hours"></div>
+        <h4>Fechar ou alterar uma data específica</h4>
+        <form id="exception-form" class="grid-form">
+          <label>Data <input type="date" name="date" required /></label>
+          <label>Situação
+            <select name="isOpen"><option value="0">Fechado</option><option value="1">Aberto em horário especial</option></select>
+          </label>
+          <label>Início <input type="time" name="startTime" value="09:00" /></label>
+          <label>Fim <input type="time" name="endTime" value="18:00" /></label>
+          <label class="full">Motivo/observação <input type="text" name="note" placeholder="Feriado, plantão, evento…" /></label>
+          <div><button type="submit">Salvar dia especial</button></div>
+        </form>
+        <div id="calendar-exceptions"></div>
+      </details>
+    </section>
+
+    <!-- Customers -->
+    <section id="tab-customers" class="tab">
+      <div class="page-heading customers-heading">
+        <div><span class="eyebrow">Banco de dados</span><h2>Clientes</h2><p>Cadastre e mantenha os dados dos clientes desta empresa.</p></div>
+        <button type="button" id="customers-export" class="secondary">Exportar TXT ( ; )</button>
+      </div>
+      <div class="customers-layout">
+        <div class="card customers-main">
+          <div class="customers-toolbar">
+            <label class="search-box" for="customer-search"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-search" /></svg><input id="customer-search" type="search" placeholder="Buscar por nome ou telefone" autocomplete="off" /></label>
+            <span id="customer-count" class="muted">0 clientes</span>
+          </div>
+          <div id="customer-selection-toolbar" class="selection-toolbar hidden" aria-live="polite">
+            <span><b id="customer-selection-count">0</b> selecionado(s)</span>
+            <div>
+              <button type="button" id="customer-select-all" class="small secondary">Selecionar todos</button>
+              <button type="button" id="customer-delete-selected" class="small danger">Excluir selecionados</button>
+              <button type="button" id="customer-selection-cancel" class="small secondary">Cancelar</button>
+            </div>
+          </div>
+          <div id="customer-list"></div>
+        </div>
+        <aside class="card customer-form-card">
+          <h3 id="customer-form-title">Novo cliente</h3>
+          <form id="customer-form">
+            <input type="hidden" name="id" />
+            <label>Nome <input type="text" name="name" required maxlength="240" autocomplete="name" /></label>
+            <label>Número de contato <input type="tel" name="phone" required placeholder="(11) 99999-9999" autocomplete="tel" /></label>
+            <div id="customer-extra-fields"></div>
+            <button type="submit">Salvar cliente</button>
+            <button type="button" id="customer-cancel-edit" class="secondary hidden">Cancelar edição</button>
+          </form>
+          <p class="muted customer-fields-help">Sem configuração no prompt, o formulário usa somente <b>Nome</b> e <b>Número de contato</b>. Para incluir outros dados, use: <b>Campos do formulário de clientes: Nome; Número de contato; CPF; E-mail; Categoria</b>.</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Chats -->
+    <section id="tab-chats" class="tab active">
+      <div class="page-heading compact-heading">
+        <div><span class="eyebrow">Atendimento</span><h2>Conversas</h2><p>Atenda seus clientes e acompanhe as respostas da automação.</p></div>
+      </div>
+      <div class="chat-layout">
+        <aside class="card contacts-panel">
+          <label class="search-box" for="contact-search"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-search" /></svg><input id="contact-search" type="search" placeholder="Buscar conversa" autocomplete="off" /></label>
+          <div id="conversation-selection-toolbar" class="selection-toolbar compact hidden" aria-live="polite">
+            <span><b id="conversation-selection-count">0</b> selecionada(s)</span>
+            <div>
+              <button type="button" id="conversation-select-all" class="small secondary">Todas</button>
+              <button type="button" id="conversation-delete-selected" class="small danger">Excluir</button>
+              <button type="button" id="conversation-selection-cancel" class="small secondary">Cancelar</button>
+            </div>
+          </div>
+          <div id="contact-list"></div>
+        </aside>
+        <div id="chat-panel" class="card">
+          <div id="chat-header" class="muted">
+            <span id="chat-contact-name">Selecione uma conversa</span>
+            <div id="chat-header-actions" class="chat-header-actions hidden">
+              <button type="button" id="chat-notes-toggle" class="small secondary">Notas internas</button>
+              <select id="chat-transfer-user" aria-label="Transferir para outro atendente"><option value="">Transferir para…</option></select>
+              <button type="button" id="chat-resolve" class="small">Resolver</button>
+              <button type="button" id="chat-register-customer" class="small secondary hidden">Cadastrar cliente</button>
+            </div>
+          </div>
+          <aside id="chat-internal-notes" class="chat-internal-notes hidden">
+            <div class="chat-notes-head"><div><b>Notas internas</b><small>Visíveis para todos os usuários da empresa.</small></div><button type="button" id="chat-notes-close" class="small secondary">Fechar</button></div>
+            <form id="chat-note-form"><textarea id="chat-note-input" rows="2" maxlength="8000" placeholder="Escreva uma nota para a equipe…" required></textarea><button type="submit" class="small">Adicionar nota</button></form>
+            <div id="chat-note-list"></div>
+          </aside>
+          <div id="chat-messages"><div class="empty-state"><span><svg class="ui-icon"><use href="icons.svg#i-message" /></svg></span><b>Nenhuma conversa selecionada</b><small>Escolha um contato ao lado para começar.</small></div></div>
+          <div id="chat-upload-status" class="chat-upload-status hidden" role="status" aria-live="polite"></div>
+          <form id="chat-send-form" class="hidden">
+            <button type="button" id="btn-toggle-pause"></button>
+            <div class="chat-composer">
+              <div id="chat-emoji-picker" class="emoji-picker hidden" aria-label="Emojis"></div>
+              <button type="button" id="chat-attach" class="composer-icon secondary" aria-label="Anexar arquivo" title="Anexar imagem, vídeo, GIF ou documento">📎</button>
+              <input id="chat-file-input" class="hidden" type="file" accept="image/*,video/*,.webp,.gif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z" />
+              <button type="button" id="chat-gif" class="composer-icon secondary" aria-label="Enviar GIF" title="Enviar GIF">GIF</button>
+              <button type="button" id="chat-sticker" class="composer-icon secondary" aria-label="Enviar figurinha" title="Enviar figurinha">▧</button>
+              <button type="button" id="chat-emoji" class="composer-icon secondary" aria-label="Inserir emoji" title="Emojis">😊</button>
+              <button type="button" id="chat-record-audio" class="composer-icon secondary" aria-label="Gravar áudio" title="Gravar áudio">🎙️</button>
+              <input type="text" id="chat-input" placeholder="Digite uma mensagem…" autocomplete="off" />
+              <button type="submit" class="chat-send-button">Enviar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- Internal team communication -->
+    <section id="tab-internal" class="tab">
+      <div class="page-heading compact-heading">
+        <div><span class="eyebrow">Equipe</span><h2>Comunicação interna</h2><p>Converse com atendentes e administradores sem usar o WhatsApp.</p></div>
+      </div>
+      <div class="chat-layout internal-chat-layout">
+        <aside class="card contacts-panel">
+          <label class="search-box" for="internal-contact-search"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-search" /></svg><input id="internal-contact-search" type="search" placeholder="Buscar na equipe" /></label>
+          <div id="internal-contact-list"></div>
+        </aside>
+        <div id="internal-chat-panel" class="card">
+          <div class="internal-chat-header"><span id="internal-contact-name">Selecione alguém da equipe</span></div>
+          <div id="internal-messages"><div class="empty-state"><span><svg class="ui-icon"><use href="icons.svg#i-users" /></svg></span><b>Nenhuma conversa selecionada</b><small>Escolha um usuário ao lado para conversar.</small></div></div>
+          <form id="internal-send-form" class="hidden">
+            <div id="internal-emoji-picker" class="emoji-picker hidden" aria-label="Emojis"></div>
+            <input id="internal-file-input" class="hidden" type="file" accept="image/*,video/*,.webp,.gif,.pdf,.txt" />
+            <button type="button" id="internal-attach" class="composer-icon secondary" aria-label="Anexar arquivo">📎</button>
+            <button type="button" id="internal-gif" class="composer-icon secondary" aria-label="Enviar GIF">GIF</button>
+            <button type="button" id="internal-sticker" class="composer-icon secondary" aria-label="Enviar figurinha">▧</button>
+            <button type="button" id="internal-emoji" class="composer-icon secondary" aria-label="Inserir emoji">😊</button>
+            <button type="button" id="internal-record-audio" class="composer-icon secondary" aria-label="Gravar áudio">🎙️</button>
+            <input id="internal-input" type="text" placeholder="Mensagem para a equipe…" autocomplete="off" />
+            <button type="submit">Enviar</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- Smart notes -->
+    <section id="tab-notes" class="tab">
+      <div class="card notes-toolbar">
+        <div>
+          <h3>Notas inteligentes</h3>
+          <p class="muted">Pendências detectadas automaticamente nas conversas, como agendamentos, cadastros, pedidos e retornos.</p>
+        </div>
+        <label>Exibir
+          <select id="notes-filter">
+            <option value="open">Pendentes</option>
+            <option value="done">Concluídas</option>
+            <option value="all">Todas</option>
+          </select>
+        </label>
+      </div>
+      <div id="notes-list"></div>
+    </section>
+
+    <!-- Commercial accounts (Super Master only) -->
+    <section id="tab-companies" class="tab" data-super>
+      <div class="page-heading">
+        <div><span class="eyebrow">Super Master</span><h2>Empresas e contas Admin</h2><p>Crie e controle operações independentes, cada uma com seu WhatsApp, agenda, equipe e consumo da IA.</p></div>
+      </div>
+      <div class="card">
+        <h3>Nova empresa</h3>
+        <form id="tenant-form" class="grid-form">
+          <label>Nome da empresa <input type="text" name="name" required placeholder="Clínica Exemplo" /></label>
+          <label>Identificador <input type="text" name="slug" placeholder="clinica-exemplo" /></label>
+          <label>Nome do Admin <input type="text" name="adminDisplayName" required /></label>
+          <label>Usuário do Admin <input type="text" name="adminUsername" required placeholder="admin.clinica" /></label>
+          <label>Senha inicial <input type="password" name="adminPassword" minlength="8" required /></label>
+          <div><button type="submit">Criar empresa e Admin</button></div>
+        </form>
+      </div>
+      <div id="tenants-list" class="tenant-list"></div>
+    </section>
+
+    <!-- Users (Admin and Super Master) -->
+    <section id="tab-users" class="tab" data-master>
+      <div class="card">
+        <h3>Equipe da empresa ativa</h3>
+        <p class="muted">O Admin configura sua conta. Atendentes acessam somente QR Code, Conversas, Calendário e Notas Inteligentes.</p>
+        <form id="user-form" class="grid-form">
+          <label>Nome <input type="text" name="displayName" required /></label>
+          <label>Usuário <input type="text" name="username" required placeholder="atendente.maria" /></label>
+          <label>Senha inicial <input type="password" name="password" minlength="8" required /></label>
+          <label>Permissão
+            <select name="role"><option value="attendant">Atendente</option><option value="admin">Admin</option></select>
+          </label>
+          <div><button type="submit">Criar usuário</button></div>
+        </form>
+      </div>
+      <div id="users-list"></div>
+    </section>
+
+    <!-- API usage and cost report (master only) -->
+    <section id="tab-usage" class="tab" data-master>
+      <div id="usage-report" class="usage-report">
+        <div class="usage-report-brand">
+          <img src="logo-atnva.png" alt="atnva.ia" />
+          <div><b>Relatório de consumo da API</b><span id="usage-report-period"></span></div>
+        </div>
+
+        <div class="page-heading usage-heading">
+          <div><span class="eyebrow">Controle financeiro</span><h2>Consumo da API</h2><p>Acompanhe os tokens utilizados pela inteligência artificial e o custo cobrado pela provedora.</p></div>
+          <div class="report-actions no-print">
+            <button type="button" id="usage-export" class="secondary">Baixar CSV</button>
+            <button type="button" id="usage-print">Imprimir / Salvar PDF</button>
+          </div>
+        </div>
+
+        <form id="usage-filter" class="card usage-controls no-print">
+          <label>Data inicial<input type="date" name="from" required /></label>
+          <label>Data final<input type="date" name="to" required /></label>
+          <button type="submit">Atualizar relatório</button>
+          <button type="button" id="usage-current-month" class="secondary">Este mês</button>
+        </form>
+
+        <div id="usage-empty" class="card empty-state hidden"><span><svg class="ui-icon"><use href="icons.svg#i-chart" /></svg></span><b>Ainda não há consumo registrado</b><small>Os dados serão contabilizados automaticamente nas próximas respostas da IA.</small></div>
+
+        <div id="usage-content">
+          <div class="usage-kpis">
+            <article class="card usage-kpi"><span>Chamadas</span><strong id="usage-calls">0</strong><small>requisições à API</small></article>
+            <article class="card usage-kpi"><span>Tokens totais</span><strong id="usage-total-tokens">0</strong><small id="usage-token-detail">0 entrada · 0 saída</small></article>
+            <article class="card usage-kpi"><span>Custo em dólar</span><strong id="usage-cost-usd">US$ 0,00</strong><small id="usage-cost-kind">valor cobrado pela API</small></article>
+            <article class="card usage-kpi accent"><span>Conversão estimada</span><strong id="usage-cost-brl">R$ 0,00</strong><small id="usage-exchange-label">cotação configurada</small></article>
+          </div>
+
+          <div class="card budget-card">
+            <div class="budget-summary">
+              <div><span class="eyebrow">Orçamento mensal</span><h3><span id="usage-month-cost">US$ 0,00</span> de <span id="usage-budget-label">US$ 0,00</span></h3><p id="usage-budget-status" class="muted"></p></div>
+              <strong id="usage-budget-percent">0%</strong>
+            </div>
+            <div class="budget-track"><span id="usage-budget-bar"></span></div>
+            <details class="budget-settings no-print">
+              <summary>Configurar orçamento e conversão</summary>
+              <form id="usage-budget-form" class="grid-form budget-form">
+                <label>Limite mensal (US$)<input type="number" name="api_monthly_budget_usd" min="0" step="0.01" /></label>
+                <label>Cotação do dólar (R$)<input type="number" name="api_usd_brl_rate" min="0" step="0.01" /></label>
+                <label>Alerta ao atingir (%)<input type="number" name="api_cost_alert_percent" min="1" max="100" /></label>
+                <div><button type="submit">Salvar controle financeiro</button></div>
+              </form>
+            </details>
+          </div>
+
+          <div class="usage-grid">
+            <div class="card">
+              <div class="section-title"><div><h3>Consumo diário</h3><p>Comparativo de custo no período</p></div></div>
+              <div id="usage-daily-chart" class="usage-chart"></div>
+            </div>
+            <div class="card">
+              <div class="section-title"><div><h3>Finalidade das chamadas</h3><p>Onde os tokens foram utilizados</p></div></div>
+              <div id="usage-purpose-list" class="purpose-list"></div>
+            </div>
+          </div>
+
+          <div class="card usage-table-card">
+            <div class="section-title"><div><h3>Consumo por modelo</h3><p>Tokens e custo agrupados pelo modelo utilizado</p></div></div>
+            <div class="table-scroll"><table><thead><tr><th>Modelo</th><th>Chamadas</th><th>Entrada</th><th>Saída</th><th>Total</th><th>Custo</th></tr></thead><tbody id="usage-model-rows"></tbody></table></div>
+          </div>
+
+          <div class="card usage-table-card">
+            <div class="section-title"><div><h3>Chamadas recentes</h3><p>Detalhamento para auditoria do consumo</p></div></div>
+            <div class="table-scroll"><table><thead><tr><th>Data e hora</th><th>Finalidade</th><th>Modelo</th><th>Entrada</th><th>Cache</th><th>Saída</th><th>Total</th><th>Custo</th></tr></thead><tbody id="usage-recent-rows"></tbody></table></div>
+          </div>
+
+          <div class="usage-report-footer">
+            <span>Relatório gerado em <b id="usage-generated-at">—</b></span>
+            <span>Custos marcados com * são estimativas calculadas a partir dos tokens; os demais são valores informados pela própria API.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section id="tab-settings" class="tab" data-master>
+      <form id="settings-form" class="card">
+        <div class="row">
+          <label class="check"><input type="checkbox" name="bot_enabled" /> Robô ativado</label>
+          <label class="check"><input type="checkbox" name="ai_enabled" /> Respostas com IA</label>
+          <label class="check"><input type="checkbox" name="learning_enabled" /> Aprendizado automático</label>
+        </div>
+        <label>Provedor de IA
+          <select name="ai_provider" id="ai-provider">
+            <option value="interna">IA interna — inteligência própria do robô (local, sem custo de API)</option>
+            <option value="grok">Grok (xAI) — requer chave de API</option>
+          </select>
+          <span class="field-help">A IA interna atende com base no prompt de comportamento e nas informações do negócio, aprende com os atendimentos reais e responde de forma humanizada — tudo neste servidor, sem enviar dados para APIs externas.</span>
+        </label>
+        <label class="check" data-provider="interna"><input type="checkbox" name="internal_learning_autoapprove" /> Aprovar automaticamente o que a IA interna aprender nos atendimentos</label>
+        <fieldset class="settings-group" data-super data-provider="grok">
+          <legend>API da inteligência artificial</legend>
+          <label>Chave da API xAI (Grok)
+            <span class="secret-input">
+              <input type="password" name="xai_api_key" id="xai-api-key" autocomplete="new-password" placeholder="xai-..." />
+              <button type="button" id="btn-toggle-api-key" class="small secondary">Mostrar</button>
+            </span>
+          </label>
+          <p id="api-key-status" class="muted">Verificando configuração…</p>
+          <p class="muted">Ainda não tem uma chave? Crie uma no <a href="https://console.x.ai" target="_blank" rel="noreferrer">console da xAI</a>.</p>
+          <p class="muted">A chave fica salva somente neste servidor e nunca é exibida novamente. Deixe o campo vazio para manter a chave atual.</p>
+          <button type="button" id="btn-remove-api-key" class="small danger hidden">Remover chave salva</button>
+        </fieldset>
+        <p class="muted" data-admin-only data-provider="grok">A inteligência artificial é fornecida pela conta central. O consumo desta empresa continua sendo contabilizado separadamente.</p>
+        <label data-provider="grok">Modelo de IA
+          <select name="model">
+            <option value="grok-4.5">Grok 4.5 (mais inteligente)</option>
+            <option value="grok-4.3">Grok 4.3 (equilíbrio)</option>
+            <option value="grok-4.20-0309-non-reasoning">Grok 4.20 non-reasoning (mais rápido/barato)</option>
+          </select>
+        </label>
+        <label>Nome da empresa
+          <input type="text" name="business_name" />
+        </label>
+        <label>Prompt de comportamento (limites e instruções do robô)
+          <textarea name="system_prompt" rows="8"></textarea>
+          <span class="field-help">Para permitir avisos automáticos, escreva claramente “enviar mensagem para o número…” e informe o telefone. Somente números declarados aqui ou nas informações do negócio poderão receber mensagens da IA.</span>
+          <span class="field-help">O formulário padrão tem Nome e Número de contato. Para incluir outros dados, escreva: “Campos do formulário de clientes: Nome; Número de contato; CPF; E-mail; Categoria”.</span>
+          <span class="field-help">Fatos como “Treinos: terça e quinta às 19h” são sincronizados automaticamente com a Base de Conhecimento ao salvar.</span>
+        </label>
+        <label>Informações do negócio (horários, endereço, preços, políticas…)
+          <textarea name="business_info" rows="6" placeholder="Ex.: Horário: seg–sex 9h–18h. Endereço: Rua X, 123. Entregamos em toda a cidade…"></textarea>
+        </label>
+        <label>Mensagem de boas-vindas (primeiro contato — vazio para desativar)
+          <input type="text" name="welcome_message" />
+        </label>
+        <label>Resposta para áudios/imagens (vazio para ignorar)
+          <input type="text" name="non_text_reply" />
+        </label>
+        <label>Mensagem quando a IA falha (vazio para ficar em silêncio)
+          <input type="text" name="fallback_message" />
+        </label>
+        <fieldset class="settings-group">
+          <legend>Atendimento humano</legend>
+          <label class="check"><input type="checkbox" name="attendant_name_enabled" /> Mostrar o nome do atendente em negrito antes das mensagens enviadas</label>
+          <label>Mensagem ao resolver atendimento
+            <textarea name="resolved_message" rows="3"></textarea>
+          </label>
+          <label>Mensagem ao transferir atendimento
+            <textarea name="transfer_message" rows="3"></textarea>
+          </label>
+          <span class="field-help">Variáveis disponíveis: {cliente}, {atendente} e {novo_atendente}.</span>
+        </fieldset>
+        <label>Histórico enviado à IA (mensagens)
+          <input type="number" name="max_history" min="2" max="100" />
+        </label>
+        <label>Tempo limite de inatividade para encerrar atendimento (minutos)
+          <input type="number" name="inactivity_timeout_minutes" min="0" max="1440" placeholder="5" />
+          <span class="field-help">Tempo sem interação em atendimento humano para o robô reativar e concluir automaticamente. Defina 0 para desativar.</span>
+        </label>
+        <button type="submit">Salvar configurações</button>
+        <span id="settings-saved" class="ok hidden">Salvo</span>
+      </form>
+    </section>
+
+    <!-- Canned responses -->
+    <section id="tab-canned" class="tab" data-master>
+      <div class="card">
+        <h3>Nova resposta pronta</h3>
+        <form id="canned-form" class="grid-form">
+          <input type="hidden" name="id" />
+          <label>Nome <input type="text" name="name" required /></label>
+          <label>Gatilhos (separados por vírgula) <input type="text" name="triggers" required placeholder="preço, quanto custa, valor" /></label>
+          <label>Tipo de correspondência
+            <select name="match_type">
+              <option value="contains">Contém</option>
+              <option value="exact">Exatamente igual</option>
+              <option value="starts_with">Começa com</option>
+            </select>
+          </label>
+          <label>Prioridade <input type="number" name="priority" value="0" /></label>
+          <label class="full">Resposta <textarea name="response" rows="3" required></textarea></label>
+          <label class="check"><input type="checkbox" name="enabled" checked /> Ativa</label>
+          <div><button type="submit">Salvar</button> <button type="button" id="canned-cancel" class="secondary hidden">Cancelar edição</button></div>
+        </form>
+      </div>
+      <div id="canned-list"></div>
+    </section>
+
+    <!-- Rules -->
+    <section id="tab-rules" class="tab" data-master>
+      <div class="card">
+        <h3>Nova regra</h3>
+        <p class="muted">Regras têm prioridade sobre respostas prontas e IA. Use para transferir para atendimento humano ou respostas obrigatórias.</p>
+        <form id="rules-form" class="grid-form">
+          <input type="hidden" name="id" />
+          <label>Nome <input type="text" name="name" required /></label>
+          <label>Padrão <input type="text" name="pattern" required placeholder="atendente|humano" /></label>
+          <label>Tipo de correspondência
+            <select name="match_type">
+              <option value="contains">Contém</option>
+              <option value="exact">Exatamente igual</option>
+              <option value="starts_with">Começa com</option>
+              <option value="regex">Expressão regular</option>
+            </select>
+          </label>
+          <label>Ação
+            <select name="action">
+              <option value="reply">Responder</option>
+              <option value="pause_bot">Pausar robô (atendimento humano)</option>
+            </select>
+          </label>
+          <label>Prioridade <input type="number" name="priority" value="0" /></label>
+          <label class="full">Resposta (opcional para "pausar robô") <textarea name="response" rows="3"></textarea></label>
+          <label class="check"><input type="checkbox" name="enabled" checked /> Ativa</label>
+          <div><button type="submit">Salvar</button> <button type="button" id="rules-cancel" class="secondary hidden">Cancelar edição</button></div>
+        </form>
+      </div>
+      <div id="rules-list"></div>
+    </section>
+
+    <!-- Knowledge -->
+    <section id="tab-knowledge" class="tab" data-master>
+      <div class="knowledge-sync-note">
+        <svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-check" /></svg>
+        <div><b>Base conectada ao prompt</b><span>Fatos, dicas, regras e diretrizes salvos em Configurações são atualizados aqui automaticamente e ficam disponíveis para a IA interna e a IA externa.</span></div>
+      </div>
+      <div class="card">
+        <h3>Base de conhecimento</h3>
+        <p class="muted">O robô aprende com as conversas: sugestões aparecem como <b>pendentes</b> e só são usadas depois que você aprovar.</p>
+        <button id="btn-learn">Aprender com conversas recentes agora</button>
+        <span id="learn-result" class="muted"></span>
+      </div>
+      <div class="card">
+        <h3>Adicionar conhecimento manualmente</h3>
+        <form id="knowledge-form" class="grid-form">
+          <label class="full">Pergunta <input type="text" name="question" required /></label>
+          <label class="full">Resposta <textarea name="answer" rows="2" required></textarea></label>
+          <div><button type="submit">Adicionar</button></div>
+        </form>
+      </div>
+      <h3>Pendentes de aprovação</h3>
+      <div id="knowledge-pending"></div>
+      <h3>Aprovados</h3>
+      <div id="knowledge-approved"></div>
+    </section>
+  </main>
+
+  <div id="conversation-context-menu" class="context-menu hidden" role="menu" aria-label="Opções da conversa">
+    <div class="context-preview">
+      <span class="context-preview-icon"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-message" /></svg></span>
+      <div><b id="conversation-context-name">Conversa</b><small id="conversation-context-phone"></small></div>
+    </div>
+    <button type="button" id="context-select-conversation" role="menuitem">Selecionar conversa</button>
+    <button type="button" id="context-delete-conversation" class="context-menu-danger" role="menuitem">Apagar conversa</button>
+  </div>
+
+  <div id="customer-context-menu" class="context-menu hidden" role="menu" aria-label="Opções do cliente">
+    <div class="context-preview">
+      <span class="context-preview-icon"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-users" /></svg></span>
+      <div><b id="customer-context-name">Cliente</b><small id="customer-context-phone"></small></div>
+    </div>
+    <button type="button" id="context-edit-customer" role="menuitem">Editar cliente</button>
+    <button type="button" id="context-select-customer" role="menuitem">Selecionar cliente</button>
+    <button type="button" id="context-delete-customer" class="context-menu-danger" role="menuitem">Excluir cliente</button>
+  </div>
+
+  <div id="item-context-menu" class="context-menu hidden" role="menu" aria-label="Ações do item">
+    <div class="context-preview">
+      <span class="context-preview-icon"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-template" /></svg></span>
+      <div><b id="item-context-name">Item</b><small id="item-context-detail"></small></div>
+    </div>
+    <button type="button" id="context-edit-item" role="menuitem">Editar</button>
+    <button type="button" id="context-select-item" role="menuitem">Selecionar item</button>
+    <button type="button" id="context-delete-item" class="context-menu-danger" role="menuitem">Excluir item</button>
+  </div>
+
+  <div id="message-context-menu" class="context-menu hidden" role="menu" aria-label="Opções da mensagem">
+    <div class="context-preview">
+      <span class="context-preview-icon"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-message" /></svg></span>
+      <div><b>Mensagem</b><small id="message-context-preview"></small></div>
+    </div>
+    <button type="button" id="context-edit-message" role="menuitem">Editar mensagem</button>
+    <button type="button" id="context-delete-message" class="context-menu-danger" role="menuitem">Apagar mensagem</button>
+  </div>
+
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

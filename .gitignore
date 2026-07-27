@@ -1,0 +1,15 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+.vercel
+node_modules/
+node_modules.google-drive-backup/
+data/
+auth_info_baileys/
+*.db
+*.db-shm
+*.db-wal
+*.log
+src/*.google-drive-placeholder
+*.google-drive-placeholder
