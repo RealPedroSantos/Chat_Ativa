@@ -1,0 +1,22 @@
+[Unit]
+Description=Chat Ativa WhatsApp customer service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/chat-ativa
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /home/ubuntu/chat-ativa/src/index.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
