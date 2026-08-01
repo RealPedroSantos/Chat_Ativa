@@ -45,6 +45,7 @@ const tokens = new Map()
 function publicSettings() {
   const settings = getSettings()
   for (const provider of EXTERNAL_AI_PROVIDERS) delete settings[AI_PROVIDERS[provider].apiKeySetting]
+  delete settings.giphy_api_key
   return settings
 }
 
@@ -214,6 +215,7 @@ export function createServer() {
       aiConfigured: manager ? aiReady() : true,
       apiKeySource: superAdmin ? apiKeySource() : (aiConfigured() ? 'central' : null),
       aiProviderStatus: manager ? aiProviderStatus(superAdmin) : undefined,
+      giphyConfigured: manager ? Boolean(getSetting('giphy_api_key')) : undefined,
       settings: manager ? publicSettings() : undefined,
     })
   })
@@ -426,6 +428,10 @@ export function createServer() {
         if (!patch[key]) delete patch[key]
       } else delete patch[key]
     }
+    if (req.user.role === 'super_admin' && typeof patch.giphy_api_key === 'string') {
+      patch.giphy_api_key = patch.giphy_api_key.trim()
+      if (!patch.giphy_api_key) delete patch.giphy_api_key
+    } else delete patch.giphy_api_key
     updateSettings(patch)
     const promptKnowledge = syncPromptKnowledge(getSettings())
     if (promptKnowledge.added || promptKnowledge.removed) {
@@ -436,6 +442,7 @@ export function createServer() {
       aiConfigured: aiReady(),
       apiKeySource: apiKeySource(),
       aiProviderStatus: aiProviderStatus(req.user.role === 'super_admin'),
+      giphyConfigured: Boolean(getSetting('giphy_api_key')),
       settings: publicSettings(),
       promptKnowledge,
     })
@@ -444,6 +451,16 @@ export function createServer() {
   app.delete('/api/settings/xai-api-key', superOnly, (_req, res) => {
     setSetting('xai_api_key', '')
     res.json({ ok: true, aiConfigured: aiReady(), apiKeySource: apiKeySource(), aiProviderStatus: aiProviderStatus(true) })
+  })
+
+  app.delete('/api/settings/giphy-api-key', superOnly, (_req, res) => {
+    setSetting('giphy_api_key', '')
+    res.json({ ok: true, giphyConfigured: false })
+  })
+
+  app.get('/api/giphy/config', auth, (_req, res) => {
+    const apiKey = getSetting('giphy_api_key')
+    res.json({ configured: Boolean(apiKey), apiKey: apiKey || '' })
   })
 
   app.delete('/api/settings/:provider/api-key', superOnly, (req, res) => {
