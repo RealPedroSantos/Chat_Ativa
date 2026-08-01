@@ -156,6 +156,7 @@ main {
 @keyframes tab-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 0 0 22px; }
+.tab > .page-heading { padding-inline: 13px; }
 .page-heading h2 { margin: 3px 0 5px; color: #111827; font-size: clamp(24px, 2.2vw, 32px); line-height: 1.15; letter-spacing: -.035em; }
 .page-heading p { max-width: 650px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
 .eyebrow { color: var(--primary); font-size: 10px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
@@ -277,6 +278,7 @@ label.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--pr
 
 /* conversations */
 .chat-layout { display: grid; grid-template-columns: minmax(260px, 330px) minmax(0, 1fr); gap: 16px; min-height: 0; }
+.chat-layout > .card { box-shadow: 0 8px 20px rgba(30,68,76,.04), var(--glass-highlight); }
 .contacts-panel { display: flex; flex-direction: column; min-height: 0; padding: 13px; overflow: hidden; }
 .search-box { position: relative; display: flex; align-items: center; margin: 0 0 10px; color: #7b8798; }
 .search-box > .ui-icon { position: absolute; left: 13px; z-index: 1; width: 16px; height: 16px; }
