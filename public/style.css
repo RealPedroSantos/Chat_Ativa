@@ -239,10 +239,10 @@ label.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--pr
 /* connection */
 .connection-layout { display: grid; grid-template-columns: minmax(0, 1.16fr) minmax(340px, .84fr); gap: 18px; align-items: stretch; }
 .connection-layout > .card { margin: 0; }
-.connection-hero { display: flex; flex-direction: column; align-items: center; min-height: 470px; justify-content: center; padding: clamp(28px, 5vw, 60px); background: linear-gradient(155deg, #fff 54%, #f1faf7); }
-.connection-orb { display: grid; place-items: center; width: 66px; height: 66px; margin-bottom: 18px; border-radius: 22px; color: #fff; background: var(--primary); box-shadow: none; font-size: 34px; }
-.connection-orb .ui-icon { width: 28px; height: 28px; stroke-width: 1.65; }
-#conn-status-text { max-width: 660px; margin-bottom: 8px; color: #263241; font-size: 17px; font-weight: 750; line-height: 1.5; }
+.connection-hero { display: flex; flex-direction: column; align-items: center; min-height: 470px; justify-content: flex-start; padding: clamp(24px, 3.2vw, 42px); background: linear-gradient(155deg, #fff 54%, #f1faf7); }
+.connection-card-heading { align-self: stretch; align-items: flex-start; width: 100%; margin-bottom: clamp(20px, 3vh, 30px); text-align: left; }
+.connection-card-heading > div { width: 100%; }
+#conn-status-text { width: min(400px, 100%); max-width: 400px; margin-bottom: 8px; color: #263241; font-size: 17px; font-weight: 750; line-height: 1.5; }
 #conn-user { margin: 6px 0 14px; }
 .qr-frame { margin: 18px auto 10px; padding: 13px; border: 1px solid var(--border); border-radius: 18px; background: #fff; box-shadow: var(--shadow); }
 .qr-frame:has(.hidden) { display: none; }
@@ -919,12 +919,6 @@ nav#tabs button.active .nav-icon { color: #9dffe0; }
     radial-gradient(circle at 80% 10%, rgba(91,221,194,.2), transparent 18rem),
     linear-gradient(145deg, rgba(255,255,255,.75), rgba(240,252,248,.53));
 }
-.connection-orb {
-  background: linear-gradient(145deg, rgba(24,174,142,.95), rgba(5,102,83,.9));
-  border: 1px solid rgba(255,255,255,.45);
-  box-shadow: 0 14px 30px rgba(8,122,101,.23), inset 0 1px 0 rgba(255,255,255,.38);
-}
-
 button {
   border-color: rgba(255,255,255,.38);
   background: linear-gradient(145deg, rgba(17,153,127,.96), rgba(5,102,83,.94));
@@ -990,6 +984,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 @media (min-width: 781px) {
+  #tab-connection.active { height: calc(100dvh - 104px); min-height: 0; }
   body:has(#tab-chats.active) main, body:has(#tab-internal.active) main {
     height: calc(100dvh - 104px);
     padding-top: 24px;
