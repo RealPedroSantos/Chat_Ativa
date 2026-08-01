@@ -526,6 +526,7 @@ const DEFAULT_SETTINGS = {
   groq_api_key: '',
   mistral_api_key: '',
   openrouter_api_key: '',
+  giphy_api_key: '',
   model: 'grok-4.5',
   max_history: '20',
   business_name: 'Minha Empresa',
@@ -650,6 +651,7 @@ const GLOBAL_SECRET_SETTINGS = new Set([
   'groq_api_key',
   'mistral_api_key',
   'openrouter_api_key',
+  'giphy_api_key',
 ])
 
 export function getSetting(key) {
