@@ -374,12 +374,19 @@ label.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--pr
 #chat-send-form button { flex: 0 0 auto; }
 .chat-composer { position: relative; display: flex; align-items: center; gap: 7px; min-width: 0; }
 .chat-composer #chat-input { flex: 1; min-width: 80px; margin: 0; }
+#chat-input, #internal-input {
+  border: 0;
+  border-radius: 100px;
+}
+#chat-send-form > #btn-toggle-pause,
+.chat-send-button,
+#internal-send-form button[type=submit] { border-radius: 100px; }
 .audio-preview { display: none; align-items: center; gap: 8px; width: 100%; min-width: 0; }
 .audio-preview audio { flex: 1; min-width: 120px; height: 38px; }
 .audio-preview-active > .audio-preview { display: flex; }
 .chat-composer.audio-preview-active > :not(.audio-preview):not(.emoji-picker),
 #internal-send-form.audio-preview-active > :not(.audio-preview):not(.emoji-picker) { display: none; }
-.composer-icon { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 11px; font-size: 12px; }
+.composer-icon { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 100px; font-size: 12px; }
 .composer-icon .ui-icon { width: 18px; height: 18px; }
 .composer-icon.recording { width: auto; min-width: 76px; padding: 0 11px; color: #fff; border-color: #d14343; background: #d14343; animation: recording-pulse 1.2s ease-in-out infinite; }
 .chat-upload-status { padding: 7px 16px; border-top: 1px solid #d6eee7; color: var(--primary-dark); background: #f0faf7; font-size: 10px; }
