@@ -387,7 +387,7 @@ label.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--pr
 @media (min-width: 781px) {
   body:has(#tab-chats.active), body:has(#tab-internal.active) { overflow: hidden; }
   body:has(#tab-chats.active) main, body:has(#tab-internal.active) main { height: calc(100dvh - 72px); padding-bottom: 24px; overflow: hidden; }
-  #tab-chats.active, #tab-internal.active { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100%; min-height: 0; }
+  #tab-chats.active, #tab-internal.active { display: grid; grid-template-rows: minmax(0, 1fr); height: 100%; min-height: 0; }
   #tab-chats .chat-layout, #tab-internal .chat-layout { height: 100%; min-height: 0; overflow: hidden; }
   #tab-chats .contacts-panel, #tab-chats #chat-panel, #tab-internal .contacts-panel, #internal-chat-panel { height: 100%; min-height: 0; max-height: none; }
 }
@@ -522,6 +522,7 @@ label.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--pr
 .usage-report-brand b { color: var(--text); font-size: 13px; }
 .usage-heading { align-items: center; }
 .report-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.usage-actions { margin: 0 0 18px; }
 .usage-controls { display: grid; grid-template-columns: minmax(150px, 220px) minmax(150px, 220px) auto auto; align-items: end; gap: 12px; }
 .usage-controls label { margin: 0; }
 .usage-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
