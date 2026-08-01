@@ -225,6 +225,14 @@
             <button type="button" id="btn-toggle-pause"></button>
             <div class="chat-composer">
               <div id="chat-emoji-picker" class="emoji-picker hidden" aria-label="Emojis"></div>
+              <div id="chat-gif-picker" class="gif-picker hidden" aria-label="Buscar GIFs no GIPHY">
+                <form class="gif-search-form" data-giphy-search>
+                  <label class="search-box"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-search" /></svg><input type="search" maxlength="50" placeholder="Buscar GIF no GIPHY" autocomplete="off" /></label>
+                  <button type="button" class="icon-button secondary" data-giphy-close aria-label="Fechar busca de GIF"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-x" /></svg></button>
+                </form>
+                <div class="gif-results" data-giphy-results></div>
+                <a class="giphy-attribution" href="https://giphy.com" target="_blank" rel="noreferrer">Powered by <b>GIPHY</b></a>
+              </div>
               <div class="audio-preview" aria-label="Prévia do áudio gravado">
                 <audio id="chat-audio-preview-player" controls preload="metadata"></audio>
                 <button type="button" id="chat-audio-discard" class="composer-icon secondary" aria-label="Descartar áudio" title="Descartar áudio"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-x" /></svg></button>
@@ -256,6 +264,14 @@
           <div id="internal-messages"><div class="empty-state"><span><svg class="ui-icon"><use href="icons.svg#i-users" /></svg></span><b>Nenhuma conversa selecionada</b><small>Escolha um usuário ao lado para conversar.</small></div></div>
           <form id="internal-send-form" class="hidden">
             <div id="internal-emoji-picker" class="emoji-picker hidden" aria-label="Emojis"></div>
+            <div id="internal-gif-picker" class="gif-picker hidden" aria-label="Buscar GIFs no GIPHY">
+              <form class="gif-search-form" data-giphy-search>
+                <label class="search-box"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-search" /></svg><input type="search" maxlength="50" placeholder="Buscar GIF no GIPHY" autocomplete="off" /></label>
+                <button type="button" class="icon-button secondary" data-giphy-close aria-label="Fechar busca de GIF"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-x" /></svg></button>
+              </form>
+              <div class="gif-results" data-giphy-results></div>
+              <a class="giphy-attribution" href="https://giphy.com" target="_blank" rel="noreferrer">Powered by <b>GIPHY</b></a>
+            </div>
             <div class="audio-preview" aria-label="Prévia do áudio gravado">
               <audio id="internal-audio-preview-player" controls preload="metadata"></audio>
               <button type="button" id="internal-audio-discard" class="composer-icon secondary" aria-label="Descartar áudio" title="Descartar áudio"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-x" /></svg></button>
@@ -486,6 +502,18 @@
           <p class="muted">Ainda não tem uma chave? Crie uma no <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noreferrer">OpenRouter</a>.</p>
           <p class="muted">A chave fica salva somente neste servidor e nunca é exibida novamente. Deixe o campo vazio para manter a chave atual.</p>
           <button type="button" class="small danger hidden btn-remove-api-key" data-key-provider="openrouter">Remover chave salva</button>
+        </fieldset>
+        <fieldset class="settings-group" data-super>
+          <legend>Biblioteca de GIFs</legend>
+          <label>Chave da API GIPHY
+            <span class="secret-input">
+              <input type="password" name="giphy_api_key" autocomplete="new-password" placeholder="Chave do GIPHY Developers" />
+              <button type="button" class="small secondary btn-toggle-api-key">Mostrar</button>
+            </span>
+          </label>
+          <p id="giphy-api-status" class="muted">Verificando configuração…</p>
+          <p class="muted">Crie uma chave para Web no <a href="https://developers.giphy.com/dashboard/" target="_blank" rel="noreferrer">GIPHY Developers</a>. Deixe o campo vazio para manter a chave atual.</p>
+          <button type="button" id="btn-remove-giphy-key" class="small danger hidden">Remover chave salva</button>
         </fieldset>
         <p class="muted" data-admin-only data-provider="grok,gemini,groq,mistral,openrouter">A inteligência artificial é fornecida pela conta central. O consumo desta empresa continua sendo contabilizado separadamente.</p>
         <label data-provider="grok,gemini,groq,mistral,openrouter">Modelo de IA
