@@ -805,6 +805,7 @@ nav#tabs button {
   border-radius: 18px;
   color: rgba(255,255,255,.72);
   background: transparent;
+  box-shadow: none;
   font-size: 9px;
   font-weight: 720;
   line-height: 1;
