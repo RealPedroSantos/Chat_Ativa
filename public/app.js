@@ -20,6 +20,8 @@ let currentInternalUserId = null
 let internalContacts = []
 let internalMediaRecorder = null
 let internalAudioStream = null
+let giphyApiKey = null
+let giphyConfigLoaded = false
 
 const $ = (sel) => document.querySelector(sel)
 const $$ = (sel) => [...document.querySelectorAll(sel)]
@@ -1448,6 +1450,126 @@ async function uploadChatMedia(file, { voiceNote = false, preferredKind = '' } =
   }
 }
 
+async function loadGiphyConfig() {
+  if (giphyConfigLoaded) return Boolean(giphyApiKey)
+  const config = await api('/api/giphy/config')
+  giphyApiKey = config.apiKey || ''
+  giphyConfigLoaded = true
+  return Boolean(giphyApiKey)
+}
+
+function closeGiphyPickers(except = null) {
+  $$('.gif-picker').forEach((picker) => {
+    if (picker !== except) picker.classList.add('hidden')
+  })
+}
+
+function giphyPickerState(container, html) {
+  container.querySelector('[data-giphy-results]').innerHTML = `<div class="gif-picker-state">${html}</div>`
+}
+
+async function sendGiphySelection(container, item, button) {
+  button.disabled = true
+  const target = container.dataset.giphyTarget
+  try {
+    const response = await fetch(item.sendUrl)
+    if (!response.ok) throw new Error('O arquivo do GIPHY não pôde ser baixado.')
+    const blob = await response.blob()
+    const mime = blob.type || (item.sendUrl.includes('.mp4') ? 'video/mp4' : 'image/gif')
+    const extension = mime.includes('mp4') ? 'mp4' : 'gif'
+    const file = new File([blob], `giphy-${item.id}.${extension}`, { type: mime })
+    if (target === 'internal') await uploadInternalMedia(file, { preferredKind: 'gif' })
+    else await uploadChatMedia(file, { preferredKind: 'gif' })
+    if (item.sentAnalytics) fetch(item.sentAnalytics, { mode: 'no-cors', keepalive: true }).catch(() => {})
+    container.classList.add('hidden')
+  } catch (err) {
+    notify('Falha ao enviar GIF: ' + err.message, 'error')
+  } finally {
+    button.disabled = false
+  }
+}
+
+function renderGiphyResults(container, gifs) {
+  const results = container.querySelector('[data-giphy-results]')
+  if (!gifs.length) {
+    giphyPickerState(container, 'Nenhum GIF encontrado.')
+    return
+  }
+  results.innerHTML = ''
+  for (const gif of gifs) {
+    const previewUrl = gif.images?.fixed_width_small?.webp || gif.images?.fixed_width?.webp || gif.images?.fixed_width_small?.url
+    const sendUrl = gif.images?.downsized_medium?.mp4 || gif.images?.original?.mp4 || gif.images?.downsized?.url || gif.images?.original?.url
+    if (!previewUrl || !sendUrl) continue
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'gif-result'
+    button.title = gif.title || 'Enviar GIF'
+    button.innerHTML = `<img src="${esc(previewUrl)}" alt="${esc(gif.title || 'GIF do GIPHY')}" loading="lazy" />`
+    button.addEventListener('click', () => sendGiphySelection(container, {
+      id: gif.id,
+      sendUrl,
+      sentAnalytics: gif.analytics?.onsent?.url || '',
+    }, button))
+    results.appendChild(button)
+  }
+  if (!results.children.length) giphyPickerState(container, 'Nenhum GIF compatível foi encontrado.')
+}
+
+async function searchGiphy(container, query = '') {
+  if (!await loadGiphyConfig()) {
+    giphyPickerState(container, 'A chave do GIPHY ainda não está configurada. O Super Master pode adicioná-la em <a href="#" data-open-giphy-settings>Ajustes</a>.')
+    return
+  }
+  container._giphyAbort?.abort()
+  const controller = new AbortController()
+  container._giphyAbort = controller
+  giphyPickerState(container, query ? 'Buscando GIFs…' : 'Carregando GIFs em destaque…')
+  const endpoint = query ? 'search' : 'trending'
+  const params = new URLSearchParams({ api_key: giphyApiKey, limit: '24', rating: 'pg', lang: 'pt', bundle: 'messaging_non_clips' })
+  if (query) params.set('q', query.slice(0, 50))
+  try {
+    const response = await fetch(`https://api.giphy.com/v1/gifs/${endpoint}?${params}`, { signal: controller.signal })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok || payload.meta?.status >= 400) throw new Error(payload.meta?.msg || 'Não foi possível consultar o GIPHY.')
+    renderGiphyResults(container, payload.data || [])
+  } catch (err) {
+    if (err.name !== 'AbortError') giphyPickerState(container, esc(err.message))
+  }
+}
+
+async function toggleGiphyPicker(selector, target) {
+  const container = $(selector)
+  const willOpen = container.classList.contains('hidden')
+  closeGiphyPickers(willOpen ? container : null)
+  container.classList.toggle('hidden', !willOpen)
+  if (!willOpen) return
+  $$('.emoji-picker').forEach((picker) => picker.classList.add('hidden'))
+  container.dataset.giphyTarget = target
+  const input = container.querySelector('input[type=search]')
+  input.focus()
+  await searchGiphy(container, input.value.trim())
+}
+
+$$('.gif-picker').forEach((container) => {
+  let debounce = null
+  container.querySelector('[data-giphy-search]').addEventListener('submit', (event) => {
+    event.preventDefault()
+    clearTimeout(debounce)
+    searchGiphy(container, event.currentTarget.querySelector('input').value.trim())
+  })
+  container.querySelector('input[type=search]').addEventListener('input', (event) => {
+    clearTimeout(debounce)
+    debounce = setTimeout(() => searchGiphy(container, event.target.value.trim()), 350)
+  })
+  container.querySelector('[data-giphy-close]').addEventListener('click', () => container.classList.add('hidden'))
+  container.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-open-giphy-settings]')) return
+    event.preventDefault()
+    container.classList.add('hidden')
+    $('[data-tab=settings]')?.click()
+  })
+})
+
 let pendingChatMediaKind = ''
 $('#chat-attach').addEventListener('click', () => {
   pendingChatMediaKind = ''
@@ -1455,9 +1577,7 @@ $('#chat-attach').addEventListener('click', () => {
   $('#chat-file-input').click()
 })
 $('#chat-gif').addEventListener('click', () => {
-  pendingChatMediaKind = 'gif'
-  $('#chat-file-input').accept = '.gif,image/gif,video/mp4'
-  $('#chat-file-input').click()
+  toggleGiphyPicker('#chat-gif-picker', 'chat')
 })
 $('#chat-sticker').addEventListener('click', () => {
   pendingChatMediaKind = 'sticker'
@@ -1515,6 +1635,7 @@ async function mountEmojiPicker(container, input) {
 async function toggleEmojiPicker(containerSelector, inputSelector) {
   const container = $(containerSelector)
   const willOpen = container.classList.contains('hidden')
+  if (willOpen) closeGiphyPickers()
   container.classList.toggle('hidden')
   if (willOpen) await mountEmojiPicker(container, $(inputSelector))
 }
@@ -1532,6 +1653,9 @@ document.addEventListener('click', (event) => {
   }
   if (!event.target.closest('#internal-emoji') && !event.target.closest('#internal-emoji-picker')) {
     $('#internal-emoji-picker').classList.add('hidden')
+  }
+  if (!event.target.closest('#chat-gif') && !event.target.closest('#chat-gif-picker') && !event.target.closest('#internal-gif') && !event.target.closest('#internal-gif-picker')) {
+    closeGiphyPickers()
   }
 })
 
@@ -1851,9 +1975,7 @@ $('#internal-attach').addEventListener('click', () => {
   $('#internal-file-input').click()
 })
 $('#internal-gif').addEventListener('click', () => {
-  pendingInternalMediaKind = 'gif'
-  $('#internal-file-input').accept = '.gif,image/gif,video/mp4'
-  $('#internal-file-input').click()
+  toggleGiphyPicker('#internal-gif-picker', 'internal')
 })
 $('#internal-sticker').addEventListener('click', () => {
   pendingInternalMediaKind = 'sticker'
@@ -3069,8 +3191,16 @@ function updateAiProviderUi(selectedModel = '') {
   $('#ai-warning').classList.toggle('hidden', provider === 'interna' || Boolean(aiProviderStatus[provider]?.configured))
 }
 
+function renderGiphyConfigured(configured) {
+  const status = $('#giphy-api-status')
+  if (!status) return
+  status.textContent = configured ? 'GIPHY configurado e disponível para todos os usuários.' : 'GIPHY ainda não configurado.'
+  status.classList.toggle('ok', configured)
+  $('#btn-remove-giphy-key')?.classList.toggle('hidden', !configured || CURRENT_USER?.role !== 'super_admin')
+}
+
 async function loadSettings() {
-  const { settings, aiConfigured, apiKeySource, aiProviderStatus: providerStatus } = await api('/api/state')
+  const { settings, aiConfigured, apiKeySource, aiProviderStatus: providerStatus, giphyConfigured } = await api('/api/state')
   const form = $('#settings-form')
   $('#ai-provider').value = settings.ai_provider || 'grok'
   updateAiProviderUi(settings.model)
@@ -3081,6 +3211,7 @@ async function loadSettings() {
   }
   clearApiKeyInputs(form)
   renderAiConfigured(aiConfigured, apiKeySource, providerStatus)
+  renderGiphyConfigured(giphyConfigured)
 }
 
 $('#ai-provider').addEventListener('change', () => updateAiProviderUi())
@@ -3104,6 +3235,9 @@ $('#settings-form').addEventListener('submit', async (e) => {
   const result = await api('/api/settings', { method: 'PUT', body: JSON.stringify(patch) })
   clearApiKeyInputs(form)
   renderAiConfigured(result.aiConfigured, result.apiKeySource, result.aiProviderStatus)
+  renderGiphyConfigured(result.giphyConfigured)
+  giphyApiKey = null
+  giphyConfigLoaded = false
   $('#settings-saved').classList.remove('hidden')
   const learned = Number(result.promptKnowledge?.added || 0)
   notify(learned ? `Configurações salvas. ${learned} conhecimento(s) criado(s) do prompt.` : 'Configurações salvas.')
@@ -3130,6 +3264,19 @@ document.querySelectorAll('.btn-remove-api-key').forEach((button) => {
     button.closest('fieldset').querySelector('.btn-toggle-api-key').textContent = 'Mostrar'
     renderAiConfigured(result.aiConfigured, result.apiKeySource, result.aiProviderStatus)
   })
+})
+
+$('#btn-remove-giphy-key')?.addEventListener('click', async () => {
+  if (!confirm('Remover a chave da API GIPHY salva pelo painel?')) return
+  const result = await api('/api/settings/giphy-api-key', { method: 'DELETE' })
+  const fieldset = $('#btn-remove-giphy-key').closest('fieldset')
+  const input = fieldset.querySelector('.secret-input input')
+  input.value = ''
+  input.type = 'password'
+  fieldset.querySelector('.btn-toggle-api-key').textContent = 'Mostrar'
+  giphyApiKey = null
+  giphyConfigLoaded = false
+  renderGiphyConfigured(result.giphyConfigured)
 })
 
 /* ---------- generic CRUD builders ---------- */
