@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS messages (
   cycle_id INTEGER,
   external_id TEXT,
   external_timestamp TEXT,
+  edited_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 );
@@ -188,6 +189,7 @@ CREATE TABLE IF NOT EXISTS internal_messages (
   file_size        INTEGER,
   duration_seconds INTEGER,
   is_voice_note    INTEGER NOT NULL DEFAULT 0,
+  edited_at        TEXT,
   created_at       TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
   FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL,
@@ -357,6 +359,7 @@ if (!hasColumn('messages', 'external_id')) {
 if (!hasColumn('messages', 'external_timestamp')) {
   db.exec('ALTER TABLE messages ADD COLUMN external_timestamp TEXT')
 }
+if (!hasColumn('messages', 'edited_at')) db.exec('ALTER TABLE messages ADD COLUMN edited_at TEXT')
 if (!hasColumn('messages', 'message_type')) db.exec("ALTER TABLE messages ADD COLUMN message_type TEXT NOT NULL DEFAULT 'text'")
 if (!hasColumn('messages', 'mime_type')) db.exec('ALTER TABLE messages ADD COLUMN mime_type TEXT')
 if (!hasColumn('messages', 'file_name')) db.exec('ALTER TABLE messages ADD COLUMN file_name TEXT')
@@ -367,6 +370,7 @@ if (!hasColumn('messages', 'is_voice_note')) db.exec('ALTER TABLE messages ADD C
 if (!hasColumn('messages', 'author_user_id')) db.exec('ALTER TABLE messages ADD COLUMN author_user_id INTEGER')
 if (!hasColumn('messages', 'author_name')) db.exec('ALTER TABLE messages ADD COLUMN author_name TEXT')
 if (!hasColumn('messages', 'cycle_id')) db.exec('ALTER TABLE messages ADD COLUMN cycle_id INTEGER')
+if (!hasColumn('internal_messages', 'edited_at')) db.exec('ALTER TABLE internal_messages ADD COLUMN edited_at TEXT')
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_external_id ON messages (tenant_id, external_id) WHERE external_id IS NOT NULL')
 if (!hasColumn('users', 'tenant_id') || db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get()?.sql.includes("'master'")) {
   db.exec(`
@@ -943,6 +947,8 @@ export function addMessage(jid, direction, text, source, {
   authorName = null,
   messageType = 'text',
   cycleId = null,
+  externalId = null,
+  externalTimestamp = null,
 } = {}) {
   const tenantId = currentTenantId()
   const contact = getContact(jid)
@@ -951,10 +957,10 @@ export function addMessage(jid, direction, text, source, {
     .prepare(`
       INSERT INTO messages (
         tenant_id, jid, direction, text, source, message_type,
-        author_user_id, author_name, cycle_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        author_user_id, author_name, cycle_id, external_id, external_timestamp
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
-    .run(tenantId, jid, direction, text, source, messageType, authorUserId, authorName, effectiveCycleId)
+    .run(tenantId, jid, direction, text, source, messageType, authorUserId, authorName, effectiveCycleId, externalId, externalTimestamp)
   const message = db.prepare('SELECT * FROM messages WHERE id = ?').get(info.lastInsertRowid)
   db.prepare('UPDATE contacts SET last_message_at = ? WHERE tenant_id = ? AND jid = ?')
     .run(message.created_at, tenantId, jid)
@@ -1052,7 +1058,16 @@ export function getMessages(jid, limit = 100) {
 }
 
 export function updateMessageText(id, text) {
-  return db.prepare('UPDATE messages SET text = ? WHERE tenant_id = ? AND id = ?').run(String(text), currentTenantId(), Number(id))
+  return db.prepare("UPDATE messages SET text = ?, edited_at = datetime('now') WHERE tenant_id = ? AND id = ?")
+    .run(String(text), currentTenantId(), Number(id))
+}
+
+export function getMessageForAction(id) {
+  return db.prepare('SELECT * FROM messages WHERE tenant_id = ? AND id = ?').get(currentTenantId(), Number(id))
+}
+
+export function deleteMessageRecord(id) {
+  return db.prepare('DELETE FROM messages WHERE tenant_id = ? AND id = ?').run(currentTenantId(), Number(id))
 }
 
 export function setMessageCycle(id, cycleId) {
@@ -1166,7 +1181,7 @@ export function getInternalMessageMedia(id, currentUserId) {
   `).get(currentTenantId(), Number(id), currentUserId, currentUserId)
 }
 
-const INTERNAL_MESSAGE_DELETE_WINDOW_SECONDS = 60
+const INTERNAL_MESSAGE_ACTION_WINDOW_SECONDS = 15 * 60
 
 // Só o próprio remetente pode apagar, e só dentro da janela de 1 minuto — a
 // checagem de "recente" é feita pelo próprio SQLite (datetime('now', ...))
@@ -1177,11 +1192,26 @@ export function deleteOwnInternalMessage(id, senderId) {
   if (!message) return { ok: false, reason: 'not_found' }
   if (Number(message.sender_id) !== Number(senderId)) return { ok: false, reason: 'forbidden' }
   const fresh = db.prepare(
-    `SELECT 1 FROM internal_messages WHERE id = ? AND created_at >= datetime('now', '-${INTERNAL_MESSAGE_DELETE_WINDOW_SECONDS} seconds')`
+    `SELECT 1 FROM internal_messages WHERE id = ? AND created_at >= datetime('now', '-${INTERNAL_MESSAGE_ACTION_WINDOW_SECONDS} seconds')`
   ).get(Number(id))
   if (!fresh) return { ok: false, reason: 'expired' }
   db.prepare('DELETE FROM internal_messages WHERE id = ?').run(Number(id))
   return { ok: true, message }
+}
+
+export function updateOwnInternalMessage(id, senderId, text) {
+  const tenantId = currentTenantId()
+  const message = db.prepare('SELECT * FROM internal_messages WHERE tenant_id = ? AND id = ?').get(tenantId, Number(id))
+  if (!message) return { ok: false, reason: 'not_found' }
+  if (Number(message.sender_id) !== Number(senderId)) return { ok: false, reason: 'forbidden' }
+  if (message.message_type !== 'text') return { ok: false, reason: 'unsupported' }
+  const fresh = db.prepare(
+    `SELECT 1 FROM internal_messages WHERE id = ? AND created_at >= datetime('now', '-${INTERNAL_MESSAGE_ACTION_WINDOW_SECONDS} seconds')`
+  ).get(Number(id))
+  if (!fresh) return { ok: false, reason: 'expired' }
+  db.prepare("UPDATE internal_messages SET text = ?, edited_at = datetime('now') WHERE tenant_id = ? AND id = ?")
+    .run(String(text), tenantId, Number(id))
+  return { ok: true, message: publicInternalMessage(db.prepare('SELECT * FROM internal_messages WHERE id = ?').get(Number(id))) }
 }
 
 export function recordHistoryImport({ jid, importedBy, fileName, messagesImported }) {
