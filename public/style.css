@@ -889,7 +889,8 @@ nav#tabs button.active .nav-icon { color: #9dffe0; }
   height: 36px;
   min-height: 36px;
   margin: 0;
-  padding: 6px 27px 6px 9px;
+  padding: 6px;
+  border-radius: 50px;
   border-color: rgba(255,255,255,.75);
   color: #284448;
   background-color: rgba(255,255,255,.54);
