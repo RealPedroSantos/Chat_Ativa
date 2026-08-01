@@ -1475,11 +1475,11 @@ async function sendGiphySelection(container, item, button) {
     const response = await fetch(item.sendUrl)
     if (!response.ok) throw new Error('O arquivo do GIPHY não pôde ser baixado.')
     const blob = await response.blob()
-    const mime = blob.type || (item.sendUrl.includes('.mp4') ? 'video/mp4' : 'image/gif')
-    const extension = mime.includes('mp4') ? 'mp4' : 'gif'
+    const mime = item.kind === 'sticker' ? 'image/webp' : (blob.type || (item.sendUrl.includes('.mp4') ? 'video/mp4' : 'image/gif'))
+    const extension = item.kind === 'sticker' ? 'webp' : (mime.includes('mp4') ? 'mp4' : 'gif')
     const file = new File([blob], `giphy-${item.id}.${extension}`, { type: mime })
-    if (target === 'internal') await uploadInternalMedia(file, { preferredKind: 'gif' })
-    else await uploadChatMedia(file, { preferredKind: 'gif' })
+    if (target === 'internal') await uploadInternalMedia(file, { preferredKind: item.kind })
+    else await uploadChatMedia(file, { preferredKind: item.kind })
     if (item.sentAnalytics) fetch(item.sentAnalytics, { mode: 'no-cors', keepalive: true }).catch(() => {})
     container.classList.add('hidden')
   } catch (err) {
@@ -1496,9 +1496,12 @@ function renderGiphyResults(container, gifs) {
     return
   }
   results.innerHTML = ''
+  const kind = container.dataset.giphyKind || 'gif'
   for (const gif of gifs) {
     const previewUrl = gif.images?.fixed_width_small?.webp || gif.images?.fixed_width?.webp || gif.images?.fixed_width_small?.url
-    const sendUrl = gif.images?.downsized_medium?.mp4 || gif.images?.original?.mp4 || gif.images?.downsized?.url || gif.images?.original?.url
+    const sendUrl = kind === 'sticker'
+      ? (gif.images?.fixed_height?.webp || gif.images?.downsized?.url || gif.images?.original?.webp)
+      : (gif.images?.downsized_medium?.mp4 || gif.images?.original?.mp4 || gif.images?.downsized?.url || gif.images?.original?.url)
     if (!previewUrl || !sendUrl) continue
     const button = document.createElement('button')
     button.type = 'button'
@@ -1507,6 +1510,7 @@ function renderGiphyResults(container, gifs) {
     button.innerHTML = `<img src="${esc(previewUrl)}" alt="${esc(gif.title || 'GIF do GIPHY')}" loading="lazy" />`
     button.addEventListener('click', () => sendGiphySelection(container, {
       id: gif.id,
+      kind,
       sendUrl,
       sentAnalytics: gif.analytics?.onsent?.url || '',
     }, button))
@@ -1523,12 +1527,14 @@ async function searchGiphy(container, query = '') {
   container._giphyAbort?.abort()
   const controller = new AbortController()
   container._giphyAbort = controller
-  giphyPickerState(container, query ? 'Buscando GIFs…' : 'Carregando GIFs em destaque…')
+  const kind = container.dataset.giphyKind || 'gif'
+  const contentLabel = kind === 'sticker' ? 'figurinhas' : 'GIFs'
+  giphyPickerState(container, query ? `Buscando ${contentLabel}…` : `Carregando ${contentLabel} em destaque…`)
   const endpoint = query ? 'search' : 'trending'
-  const params = new URLSearchParams({ api_key: giphyApiKey, limit: '24', rating: 'pg', lang: 'pt', bundle: 'messaging_non_clips' })
+  const params = new URLSearchParams({ api_key: giphyApiKey, limit: '24', rating: 'pg', lang: 'pt', bundle: kind === 'sticker' ? 'sticker_layering' : 'messaging_non_clips' })
   if (query) params.set('q', query.slice(0, 50))
   try {
-    const response = await fetch(`https://api.giphy.com/v1/gifs/${endpoint}?${params}`, { signal: controller.signal })
+    const response = await fetch(`https://api.giphy.com/v1/${kind === 'sticker' ? 'stickers' : 'gifs'}/${endpoint}?${params}`, { signal: controller.signal })
     const payload = await response.json().catch(() => ({}))
     if (!response.ok || payload.meta?.status >= 400) throw new Error(payload.meta?.msg || 'Não foi possível consultar o GIPHY.')
     renderGiphyResults(container, payload.data || [])
@@ -1537,22 +1543,29 @@ async function searchGiphy(container, query = '') {
   }
 }
 
-async function toggleGiphyPicker(selector, target) {
+async function toggleGiphyPicker(selector, target, kind = 'gif') {
   const container = $(selector)
-  const willOpen = container.classList.contains('hidden')
-  closeGiphyPickers(willOpen ? container : null)
-  container.classList.toggle('hidden', !willOpen)
-  if (!willOpen) return
+  const sameOpenMode = !container.classList.contains('hidden') && container.dataset.giphyTarget === target && container.dataset.giphyKind === kind
+  if (sameOpenMode) {
+    container.classList.add('hidden')
+    return
+  }
+  closeGiphyPickers(container)
+  container.classList.remove('hidden')
   $$('.emoji-picker').forEach((picker) => picker.classList.add('hidden'))
   container.dataset.giphyTarget = target
+  container.dataset.giphyKind = kind
+  container.setAttribute('aria-label', kind === 'sticker' ? 'Buscar figurinhas no GIPHY' : 'Buscar GIFs no GIPHY')
   const input = container.querySelector('input[type=search]')
+  input.placeholder = kind === 'sticker' ? 'Buscar figurinha no GIPHY' : 'Buscar GIF no GIPHY'
   input.focus()
   await searchGiphy(container, input.value.trim())
 }
 
 $$('.gif-picker').forEach((container) => {
   let debounce = null
-  container.querySelector('[data-giphy-search]').addEventListener('submit', (event) => {
+  container.querySelector('[data-giphy-search]').addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return
     event.preventDefault()
     clearTimeout(debounce)
     searchGiphy(container, event.currentTarget.querySelector('input').value.trim())
@@ -1577,12 +1590,10 @@ $('#chat-attach').addEventListener('click', () => {
   $('#chat-file-input').click()
 })
 $('#chat-gif').addEventListener('click', () => {
-  toggleGiphyPicker('#chat-gif-picker', 'chat')
+  toggleGiphyPicker('#chat-gif-picker', 'chat', 'gif')
 })
 $('#chat-sticker').addEventListener('click', () => {
-  pendingChatMediaKind = 'sticker'
-  $('#chat-file-input').accept = '.webp,image/webp'
-  $('#chat-file-input').click()
+  toggleGiphyPicker('#chat-gif-picker', 'chat', 'sticker')
 })
 $('#chat-file-input').addEventListener('change', async (event) => {
   const [file] = event.target.files
@@ -1654,7 +1665,7 @@ document.addEventListener('click', (event) => {
   if (!event.target.closest('#internal-emoji') && !event.target.closest('#internal-emoji-picker')) {
     $('#internal-emoji-picker').classList.add('hidden')
   }
-  if (!event.target.closest('#chat-gif') && !event.target.closest('#chat-gif-picker') && !event.target.closest('#internal-gif') && !event.target.closest('#internal-gif-picker')) {
+  if (!event.target.closest('#chat-gif') && !event.target.closest('#chat-sticker') && !event.target.closest('#chat-gif-picker') && !event.target.closest('#internal-gif') && !event.target.closest('#internal-sticker') && !event.target.closest('#internal-gif-picker')) {
     closeGiphyPickers()
   }
 })
@@ -1975,12 +1986,10 @@ $('#internal-attach').addEventListener('click', () => {
   $('#internal-file-input').click()
 })
 $('#internal-gif').addEventListener('click', () => {
-  toggleGiphyPicker('#internal-gif-picker', 'internal')
+  toggleGiphyPicker('#internal-gif-picker', 'internal', 'gif')
 })
 $('#internal-sticker').addEventListener('click', () => {
-  pendingInternalMediaKind = 'sticker'
-  $('#internal-file-input').accept = '.webp,image/webp'
-  $('#internal-file-input').click()
+  toggleGiphyPicker('#internal-gif-picker', 'internal', 'sticker')
 })
 $('#internal-file-input').addEventListener('change', async (event) => {
   const [file] = event.target.files
