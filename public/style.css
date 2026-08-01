@@ -732,14 +732,15 @@ main {
   width: 100%;
   max-width: 1460px;
   margin: 0 auto;
-  padding: clamp(26px, 4vw, 48px) clamp(18px, 4vw, 52px) 128px;
+  padding: 108px clamp(18px, 4vw, 52px) 32px;
 }
 
 .app-dock {
   position: fixed;
   z-index: 80;
+  top: max(14px, env(safe-area-inset-top));
   right: max(14px, env(safe-area-inset-right));
-  bottom: max(14px, env(safe-area-inset-bottom));
+  bottom: auto;
   left: max(14px, env(safe-area-inset-left));
   display: flex;
   align-items: center;
@@ -969,7 +970,7 @@ input:focus, textarea:focus, select:focus {
 .contact-item:hover { background: rgba(255,255,255,.48); }
 .contact-item.active { background: rgba(211,247,237,.63); box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
 .context-menu { background: rgba(249,253,253,.8); }
-.toast-region { bottom: 106px; }
+.toast-region { top: 106px; bottom: auto; }
 .toast { background: rgba(255,255,255,.82); }
 .customer-form-card { top: 20px; }
 
@@ -986,11 +987,11 @@ input:focus, textarea:focus, select:focus {
 }
 
 @media (min-width: 781px) {
-  #tab-connection.active { height: calc(100dvh - 104px); min-height: 0; }
+  #tab-connection.active { height: calc(100dvh - 132px); min-height: 0; }
   body:has(#tab-chats.active) main, body:has(#tab-internal.active) main {
-    height: calc(100dvh - 104px);
-    padding-top: 24px;
-    padding-bottom: 8px;
+    height: 100dvh;
+    padding-top: 108px;
+    padding-bottom: 24px;
   }
 }
 
@@ -1002,10 +1003,11 @@ input:focus, textarea:focus, select:focus {
 
 @media (max-width: 780px) {
   body { padding: 0; }
-  main { padding: 24px 16px 148px; }
+  main { padding: 132px 16px 28px; }
   .app-dock {
+    top: max(8px, env(safe-area-inset-top));
     right: max(8px, env(safe-area-inset-right));
-    bottom: max(8px, env(safe-area-inset-bottom));
+    bottom: auto;
     left: max(8px, env(safe-area-inset-left));
     flex-direction: column-reverse;
     gap: 4px;
@@ -1028,8 +1030,8 @@ input:focus, textarea:focus, select:focus {
   .tenant-switcher select { width: min(38vw, 150px); min-width: 0; height: 31px; min-height: 31px; }
   .header-button { min-height: 30px; }
   .badge { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .toast-region { right: 12px; bottom: 139px; width: calc(100vw - 24px); }
-  .context-menu { bottom: 139px; }
+  .toast-region { top: 124px; right: 12px; bottom: auto; width: calc(100vw - 24px); }
+  .context-menu { top: auto !important; bottom: 14px; }
 }
 
 @media (max-width: 540px) {
@@ -1042,7 +1044,7 @@ input:focus, textarea:focus, select:focus {
   nav#tabs { padding: 0; }
   nav#tabs button { min-width: 59px; padding-inline: 7px; }
   .nav-icon { width: 19px; height: 19px; flex-basis: 19px; }
-  .context-menu { right: 12px !important; bottom: 139px; left: 12px !important; }
+  .context-menu { right: 12px !important; bottom: 14px; left: 12px !important; }
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
