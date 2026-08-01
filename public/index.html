@@ -709,6 +709,15 @@
     <button type="button" id="context-delete-message" class="context-menu-danger" role="menuitem">Apagar mensagem</button>
   </div>
 
+  <div id="internal-message-context-menu" class="context-menu hidden" role="menu" aria-label="Opções da mensagem interna">
+    <div class="context-preview">
+      <span class="context-preview-icon"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-message" /></svg></span>
+      <div><b>Mensagem interna</b><small id="internal-message-context-preview"></small></div>
+    </div>
+    <button type="button" id="context-copy-internal-message" role="menuitem">Copiar texto</button>
+    <button type="button" id="context-delete-internal-message" class="context-menu-danger" role="menuitem">Apagar mensagem</button>
+  </div>
+
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
 
   <script src="app.js"></script>
