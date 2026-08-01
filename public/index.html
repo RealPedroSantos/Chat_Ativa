@@ -157,15 +157,12 @@
 
     <!-- Customers -->
     <section id="tab-customers" class="tab">
-      <div class="page-heading customers-heading">
-        <div><span class="eyebrow">Banco de dados</span><h2>Clientes</h2><p>Cadastre e mantenha os dados dos clientes desta empresa.</p></div>
-        <button type="button" id="customers-export" class="secondary">Exportar TXT ( ; )</button>
-      </div>
       <div class="customers-layout">
         <div class="card customers-main">
           <div class="customers-toolbar">
             <label class="search-box" for="customer-search"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-search" /></svg><input id="customer-search" type="search" placeholder="Buscar por nome ou telefone" autocomplete="off" /></label>
             <span id="customer-count" class="muted">0 clientes</span>
+            <button type="button" id="customers-export" class="secondary">Exportar TXT ( ; )</button>
           </div>
           <div id="customer-selection-toolbar" class="selection-toolbar hidden" aria-live="polite">
             <span><b id="customer-selection-count">0</b> selecionado(s)</span>
@@ -194,9 +191,6 @@
 
     <!-- Chats -->
     <section id="tab-chats" class="tab active">
-      <div class="page-heading compact-heading">
-        <div><span class="eyebrow">Atendimento</span><h2>Conversas</h2><p>Atenda seus clientes e acompanhe as respostas da automação.</p></div>
-      </div>
       <div class="chat-layout">
         <aside class="card contacts-panel">
           <label class="search-box" for="contact-search"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-search" /></svg><input id="contact-search" type="search" placeholder="Buscar conversa" autocomplete="off" /></label>
@@ -252,9 +246,6 @@
 
     <!-- Internal team communication -->
     <section id="tab-internal" class="tab">
-      <div class="page-heading compact-heading">
-        <div><span class="eyebrow">Equipe</span><h2>Comunicação interna</h2><p>Converse com atendentes e administradores sem usar o WhatsApp.</p></div>
-      </div>
       <div class="chat-layout internal-chat-layout">
         <aside class="card contacts-panel">
           <label class="search-box" for="internal-contact-search"><svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-search" /></svg><input id="internal-contact-search" type="search" placeholder="Buscar na equipe" /></label>
@@ -303,9 +294,6 @@
 
     <!-- Commercial accounts (Super Master only) -->
     <section id="tab-companies" class="tab" data-super>
-      <div class="page-heading">
-        <div><span class="eyebrow">Super Master</span><h2>Empresas e contas Admin</h2><p>Crie e controle operações independentes, cada uma com seu WhatsApp, agenda, equipe e consumo da IA.</p></div>
-      </div>
       <div class="card">
         <h3>Nova empresa</h3>
         <form id="tenant-form" class="grid-form">
@@ -346,12 +334,9 @@
           <div><b>Relatório de consumo da API</b><span id="usage-report-period"></span></div>
         </div>
 
-        <div class="page-heading usage-heading">
-          <div><span class="eyebrow">Controle financeiro</span><h2>Consumo da API</h2><p>Acompanhe os tokens utilizados pela inteligência artificial e o custo cobrado pela provedora.</p></div>
-          <div class="report-actions no-print">
-            <button type="button" id="usage-export" class="secondary">Baixar CSV</button>
-            <button type="button" id="usage-print">Imprimir / Salvar PDF</button>
-          </div>
+        <div class="report-actions usage-actions no-print">
+          <button type="button" id="usage-export" class="secondary">Baixar CSV</button>
+          <button type="button" id="usage-print">Imprimir / Salvar PDF</button>
         </div>
 
         <form id="usage-filter" class="card usage-controls no-print">
