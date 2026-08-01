@@ -375,6 +375,8 @@ label.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--pr
 .chat-composer { position: relative; display: flex; align-items: center; gap: 7px; min-width: 0; }
 .chat-composer #chat-input { flex: 1; min-width: 80px; margin: 0; }
 #chat-input, #internal-input {
+  padding-right: 20px;
+  padding-left: 20px;
   border: 1px solid rgba(139,165,172,.32);
   border-radius: 100px;
 }
