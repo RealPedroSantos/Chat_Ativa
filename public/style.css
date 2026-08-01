@@ -980,6 +980,9 @@ input[type=text], input[type=tel], input[type=password], input[type=number], inp
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
+input[type=text], input[type=tel], input[type=password], input[type=number], input[type=date], input[type=time], input[type=search], textarea {
+  border-width: 0;
+}
 input:hover, textarea:hover, select:hover { border-color: rgba(75,132,127,.48); background: rgba(255,255,255,.7); }
 input:focus, textarea:focus, select:focus {
   border-color: rgba(8,122,101,.65);
