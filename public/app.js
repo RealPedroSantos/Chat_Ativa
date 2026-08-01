@@ -544,6 +544,18 @@ function connectEvents() {
     }
     loadContacts()
   })
+  es.addEventListener('message_edited', (event) => {
+    const data = JSON.parse(event.data)
+    const element = $(`#chat-messages [data-msg-id="${data.id}"]`)
+    const text = element?.querySelector('.msg-text')
+    if (text) text.innerHTML = formatMessageText(data.text)
+    element?.classList.add('edited')
+  })
+  es.addEventListener('message_deleted', (event) => {
+    const data = JSON.parse(event.data)
+    $(`#chat-messages [data-msg-id="${data.id}"]`)?.remove()
+    if (contextMessageId === data.id) closeMessageContextMenu()
+  })
   es.addEventListener('contact_update', () => loadContacts())
   es.addEventListener('customer_update', () => {
     if ($('#tab-customers').classList.contains('active')) loadCustomers()
@@ -584,6 +596,13 @@ function connectEvents() {
     const data = JSON.parse(event.data)
     $(`#internal-messages [data-internal-message-id="${data.id}"]`)?.remove()
     if (contextInternalMessageId === data.id) closeInternalMessageContextMenu()
+  })
+  es.addEventListener('internal_message_edited', (event) => {
+    const data = JSON.parse(event.data)
+    const element = $(`#internal-messages [data-internal-message-id="${data.id}"]`)
+    const text = element?.querySelector('.msg-text')
+    if (text) text.innerHTML = formatMessageText(data.text)
+    element?.classList.add('edited')
   })
   es.addEventListener('calendar_update', (event) => {
     const update = JSON.parse(event.data)
@@ -808,7 +827,7 @@ function wireBulkItem(element, key, controller, context = {}) {
     const check = document.createElement('span')
     check.className = 'selection-check'
     check.setAttribute('aria-hidden', 'true')
-    check.textContent = '✓'
+    check.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="icons.svg#i-check" /></svg>'
     element.prepend(check)
   }
   attachForcePress(element, (x, y) => openItemContextMenu({
@@ -962,7 +981,7 @@ function renderContactList() {
     }
     div.innerHTML = `
       <div class="contact-main">
-        <span class="selection-check" aria-hidden="true">✓</span>
+        <span class="selection-check" aria-hidden="true"><svg class="ui-icon"><use href="icons.svg#i-check" /></svg></span>
         <div>
           <div class="cname">${esc(c.name || c.jid.split('@')[0])}</div>
           <div class="cjid">${esc(c.jid.split('@')[0])}</div>
@@ -1088,7 +1107,7 @@ function renderInternalNotes(notes) {
   for (const note of notes) {
     const item = document.createElement('article')
     item.className = 'internal-note'
-    item.innerHTML = `<div><small><b>${esc(note.author_name)}</b> · ${esc(formatDate(note.created_at))}</small><p>${esc(note.text)}</p></div><button type="button" class="small secondary" aria-label="Apagar nota">×</button>`
+    item.innerHTML = `<div><small><b>${esc(note.author_name)}</b> · ${esc(formatDate(note.created_at))}</small><p>${esc(note.text)}</p></div><button type="button" class="small secondary icon-button" aria-label="Apagar nota"><svg class="ui-icon"><use href="icons.svg#i-trash" /></svg></button>`
     item.querySelector('button').addEventListener('click', async () => {
       try {
         await api(`/api/internal-notes/${note.id}`, { method: 'DELETE' })
@@ -1272,10 +1291,13 @@ function openMessageContextMenu(msgId, msgEl, clientX, clientY) {
   contextMessageElement = msgEl
   const preview = msgEl?.querySelector('.msg-text')?.textContent || ''
   $('#message-context-preview').textContent = preview.length > 60 ? preview.slice(0, 57) + '…' : preview
-  // Only show edit for text-only outgoing messages
-  const canEdit = msgEl?.classList.contains('out') && msgEl?.querySelector('.msg-text')
+  const sentAt = Number(msgEl?.dataset.sentAt || 0)
+  const isRecent = sentAt > 0 && Date.now() - sentAt <= 15 * 60 * 1000
+  const isOwnWhatsAppMessage = msgEl?.classList.contains('out') && Boolean(msgEl?.dataset.externalId)
+  const canEdit = isOwnWhatsAppMessage && isRecent && msgEl?.dataset.messageType === 'text' && msgEl?.querySelector('.msg-text')
+  const canDelete = isOwnWhatsAppMessage && isRecent
   $('#context-edit-message').classList.toggle('hidden', !canEdit)
-  $('#context-delete-message').classList.add('hidden')
+  $('#context-delete-message').classList.toggle('hidden', !canDelete)
   const menu = $('#message-context-menu')
   menu.classList.remove('hidden')
   menu.style.left = `${Math.max(8, Math.min(clientX, window.innerWidth - 260))}px`
@@ -1312,6 +1334,7 @@ $('#context-edit-message').addEventListener('click', async () => {
     })
     const textEl = el.querySelector('.msg-text')
     if (textEl) textEl.innerHTML = formatMessageText(res.text)
+    el.classList.add('edited')
     notify('Mensagem editada.')
   } catch (err) {
     notify(err.message, 'error')
@@ -1326,8 +1349,11 @@ function appendMessage(msg) {
   const box = $('#chat-messages')
   const div = document.createElement('div')
   const systemEvent = msg.message_type === 'system_event'
-  div.className = `msg ${msg.direction}${systemEvent ? ' system-event' : ''}`
+  div.className = `msg ${msg.direction}${systemEvent ? ' system-event' : ''}${msg.edited_at ? ' edited' : ''}`
   div.dataset.msgId = msg.id
+  div.dataset.externalId = msg.external_id || ''
+  div.dataset.messageType = msg.message_type || 'text'
+  div.dataset.sentAt = String(Date.parse(String(msg.created_at).includes('T') ? msg.created_at : String(msg.created_at).replace(' ', 'T') + 'Z') || 0)
   const label = SOURCE_LABEL[msg.source] || ''
   const media = renderMessageMedia(msg)
   let messageText = String(msg.text || '')
@@ -1446,21 +1472,58 @@ $('#chat-file-input').addEventListener('change', async (event) => {
   await uploadChatMedia(file, { preferredKind })
 })
 
-const CHAT_EMOJIS = [...`😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😗 😙 😚 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🤩 🥳 😏 😒 😞 😔 😟 😕 🙁 ☹️ 😣 😖 😫 😩 🥺 😢 😭 😤 😠 😡 🤬 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🤗 🤔 🫣 🤭 🫢 🤫 🤥 😶 😐 😑 😬 🙄 😯 😦 😧 😮 😲 🥱 😴 🤤 😪 😵 🤐 🥴 🤢 🤮 🤧 😷 🤒 🤕 🤑 🤠 😈 👿 👻 💀 ☠️ 👽 🤖 🎃 😺 😸 😹 😻 😼 😽 🙀 😿 😾 👋 🤚 🖐️ ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 🫶 👐 🤲 🤝 🙏 ✍️ 💅 🤳 💪 🦾 🦿 🦵 🦶 👂 👃 🧠 🫀 🫁 👀 👁️ 👅 👄 🫦 💋 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ✅ ❌ ⚠️ ❓ ❗ 💯 ✨ ⭐ 🌟 💫 🔥 🎉 🎊 🎁 🎈 📌 📍 📅 ⏰ ☎️ 📞 📱 💬 🗨️ 📣 📢 🔔 🔕 🚀 🚗 🏍️ ✈️ 🏠 🏢 🏥 🏪 🍎 🍕 🍔 🍟 🌭 🍿 🧁 🎂 ☕ 🍺 🥂 ⚽ 🏀 🏆 🥇 🎵 🎶 🎧 📷 🎥 💡 🔑 🔒 🛒 💳 💰 📦 🚚`.split(/\s+/).filter(Boolean)]
-$('#chat-emoji-picker').innerHTML = CHAT_EMOJIS.map((emoji) => `<button type="button">${emoji}</button>`).join('')
-$('#internal-emoji-picker').innerHTML = CHAT_EMOJIS.map((emoji) => `<button type="button">${emoji}</button>`).join('')
+const EMOJI_FALLBACK = [...`😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😍 🥰 😘 😎 🤩 🥳 😭 😡 🤯 😱 🤔 🤭 😴 🤒 👻 💀 👽 🤖 👋 🤚 ✋ 👌 ✌️ 🤞 🤟 🤘 🤙 👍 👎 👊 👏 🙌 🫶 🤝 🙏 💪 👀 💋 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 💕 💯 ✨ ⭐ 🔥 🎉 🎁 📌 📅 ⏰ ☎️ 📱 💬 🔔 🚀 🚗 ✈️ 🏠 🏢 🍎 🍕 🍔 ☕ ⚽ 🏆 🎵 🎧 📷 🎥 💡 🔑 🔒 🛒 💳 💰 📦`.split(/\s+/).filter(Boolean)]
+let emojiMartModules = null
 
-$('#chat-emoji').addEventListener('click', () => {
-  $('#chat-emoji-picker').classList.toggle('hidden')
-})
-$('#chat-emoji-picker').addEventListener('click', (event) => {
-  const button = event.target.closest('button')
-  if (!button) return
-  const input = $('#chat-input')
+function insertEmoji(input, emoji) {
   const start = input.selectionStart ?? input.value.length
   const end = input.selectionEnd ?? start
-  input.setRangeText(button.textContent, start, end, 'end')
+  input.setRangeText(emoji, start, end, 'end')
   input.focus()
+}
+
+async function mountEmojiPicker(container, input) {
+  if (container.dataset.ready === 'true') return
+  container.innerHTML = '<div class="emoji-picker-loading">Carregando emojis…</div>'
+  try {
+    emojiMartModules ||= Promise.all([
+      import('https://cdn.jsdelivr.net/npm/@emoji-mart/data@1.2.1/+esm'),
+      import('https://cdn.jsdelivr.net/npm/emoji-mart@5.6.0/+esm'),
+    ])
+    const [{ default: data }, { Picker }] = await emojiMartModules
+    const picker = new Picker({
+      data,
+      locale: 'pt',
+      set: 'native',
+      theme: 'light',
+      previewPosition: 'none',
+      skinTonePosition: 'search',
+      navPosition: 'top',
+      maxFrequentRows: 2,
+      onEmojiSelect: (selection) => {
+        insertEmoji(input, selection.native)
+        container.classList.add('hidden')
+      },
+    })
+    container.replaceChildren(picker)
+  } catch {
+    container.innerHTML = `<div class="emoji-picker-fallback">${EMOJI_FALLBACK.map((emoji) => `<button type="button" data-emoji="${emoji}">${emoji}</button>`).join('')}</div>`
+  }
+  container.dataset.ready = 'true'
+}
+
+async function toggleEmojiPicker(containerSelector, inputSelector) {
+  const container = $(containerSelector)
+  const willOpen = container.classList.contains('hidden')
+  container.classList.toggle('hidden')
+  if (willOpen) await mountEmojiPicker(container, $(inputSelector))
+}
+
+$('#chat-emoji').addEventListener('click', () => toggleEmojiPicker('#chat-emoji-picker', '#chat-input'))
+$('#chat-emoji-picker').addEventListener('click', (event) => {
+  const emoji = event.target.closest('[data-emoji]')?.dataset.emoji
+  if (!emoji) return
+  insertEmoji($('#chat-input'), emoji)
   $('#chat-emoji-picker').classList.add('hidden')
 })
 document.addEventListener('click', (event) => {
@@ -1541,9 +1604,9 @@ $('#chat-record-audio')?.addEventListener('click', async () => {
       button.setAttribute('aria-label', 'Parar e enviar áudio')
       recordingTimer = setInterval(() => {
         const seconds = Math.floor((Date.now() - recordingStartedAt) / 1000)
-        button.textContent = `■ ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+        button.textContent = `Parar ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
       }, 500)
-      button.textContent = '■ 0:00'
+      button.textContent = 'Parar 0:00'
     }
   } catch (err) {
     stopRecordingUi()
@@ -1634,7 +1697,7 @@ function appendInternalMessage(message) {
   if (!box || box.querySelector(`[data-internal-message-id="${message.id}"]`)) return
   const mine = Number(message.sender_id) === Number(CURRENT_USER?.id)
   const item = document.createElement('div')
-  item.className = `msg ${mine ? 'out' : 'in'}`
+  item.className = `msg ${mine ? 'out' : 'in'}${message.edited_at ? ' edited' : ''}`
   item.dataset.internalMessageId = message.id
   const mediaUrl = `/api/internal/messages/${message.id}/media?token=${encodeURIComponent(TOKEN)}`
   const type = String(message.message_type || '')
@@ -1654,14 +1717,18 @@ function appendInternalMessage(message) {
   if (mine) attachInternalMessageGestures(item, message)
 }
 
-const INTERNAL_MESSAGE_DELETE_WINDOW_MS = 60 * 1000
+const INTERNAL_MESSAGE_ACTION_WINDOW_MS = 15 * 60 * 1000
 let contextInternalMessageId = null
 let contextInternalMessageElement = null
 
 function canDeleteInternalMessage(message) {
   if (Number(message.sender_id) !== Number(CURRENT_USER?.id)) return false
   const sentAt = new Date(String(message.created_at).replace(' ', 'T') + 'Z').getTime()
-  return Number.isFinite(sentAt) && Date.now() - sentAt < INTERNAL_MESSAGE_DELETE_WINDOW_MS
+  return Number.isFinite(sentAt) && Date.now() - sentAt < INTERNAL_MESSAGE_ACTION_WINDOW_MS
+}
+
+function canEditInternalMessage(message) {
+  return canDeleteInternalMessage(message) && message.message_type === 'text' && Boolean(message.text)
 }
 
 function closeInternalMessageContextMenu() {
@@ -1676,6 +1743,7 @@ function openInternalMessageContextMenu(message, msgEl, clientX, clientY) {
   const preview = msgEl.querySelector('.msg-text')?.textContent || msgEl.querySelector('.msg-document b')?.textContent || 'Mensagem'
   $('#internal-message-context-preview').textContent = preview.length > 60 ? preview.slice(0, 57) + '…' : preview
   $('#context-copy-internal-message').classList.toggle('hidden', !msgEl.querySelector('.msg-text'))
+  $('#context-edit-internal-message').classList.toggle('hidden', !canEditInternalMessage(message))
   $('#context-delete-internal-message').classList.toggle('hidden', !canDeleteInternalMessage(message))
   const menu = $('#internal-message-context-menu')
   menu.classList.remove('hidden')
@@ -1698,6 +1766,28 @@ $('#context-copy-internal-message').addEventListener('click', async () => {
     notify('Texto copiado.')
   } catch {
     notify('Não foi possível copiar o texto.', 'error')
+  }
+})
+
+$('#context-edit-internal-message').addEventListener('click', async () => {
+  const id = contextInternalMessageId
+  const el = contextInternalMessageElement
+  const current = el?.querySelector('.msg-text')?.textContent || ''
+  closeInternalMessageContextMenu()
+  if (!id || !el || !current) return
+  const newText = prompt('Editar mensagem:', current)
+  if (newText === null || !newText.trim()) return
+  try {
+    const result = await api(`/api/internal/messages/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ text: newText.trim() }),
+    })
+    const textEl = el.querySelector('.msg-text')
+    if (textEl) textEl.innerHTML = formatMessageText(result.message.text)
+    el.classList.add('edited')
+    notify('Mensagem editada.')
+  } catch (err) {
+    notify(err.message, 'error')
   }
 })
 
@@ -1781,14 +1871,11 @@ $('#internal-file-input').addEventListener('change', async (event) => {
     notify(err.message, 'error')
   }
 })
-$('#internal-emoji').addEventListener('click', () => $('#internal-emoji-picker').classList.toggle('hidden'))
+$('#internal-emoji').addEventListener('click', () => toggleEmojiPicker('#internal-emoji-picker', '#internal-input'))
 $('#internal-emoji-picker').addEventListener('click', (event) => {
-  const button = event.target.closest('button')
-  if (!button) return
-  const input = $('#internal-input')
-  const start = input.selectionStart ?? input.value.length
-  input.setRangeText(button.textContent, start, input.selectionEnd ?? start, 'end')
-  input.focus()
+  const emoji = event.target.closest('[data-emoji]')?.dataset.emoji
+  if (!emoji) return
+  insertEmoji($('#internal-input'), emoji)
   $('#internal-emoji-picker').classList.add('hidden')
 })
 
@@ -1828,7 +1915,7 @@ $('#internal-record-audio').addEventListener('click', async () => {
     }, { once: true })
     recorder.start(250)
     $('#internal-record-audio').classList.add('recording')
-    $('#internal-record-audio').textContent = '■ Parar'
+    $('#internal-record-audio').textContent = 'Parar'
   } catch (err) {
     stopInternalRecording()
     notify(err.name === 'NotAllowedError' ? 'Permita o uso do microfone para gravar áudio.' : 'Não foi possível iniciar a gravação.', 'error')
@@ -1952,7 +2039,7 @@ function renderCustomers() {
       .join('')
     return `
       <article class="customer-row ${customerSelectionMode ? 'selection-mode' : ''} ${selectedCustomerIds.has(customer.id) ? 'selected' : ''}" data-customer-id="${customer.id}">
-        <span class="selection-check" aria-hidden="true">✓</span>
+        <span class="selection-check" aria-hidden="true"><svg class="ui-icon"><use href="icons.svg#i-check" /></svg></span>
         <div class="customer-avatar" aria-hidden="true">${esc((customer.first_name || '?').slice(0, 1).toUpperCase())}</div>
         <div class="customer-summary">
           <strong>${esc(customerFullName(customer))}</strong>
