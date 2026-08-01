@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url'
 import {
   countUsers, createUser, deleteUser, getUserById, getUserByUsername, listUsers, updateUser, updateUserPassword,
   createTenant, deleteTenants, getTenant, listTenants, updateTenant,
-  getSetting, getSettings, setSetting, updateSettings, getContact, listContacts, markContactRead, setContactPaused, getMessageMedia, getMessages, updateMessageText,
-  createInternalMessage, createInternalNote, deleteInternalNote, deleteOwnInternalMessage, ensureOpenConversationCycle,
+  getSetting, getSettings, setSetting, updateSettings, getContact, listContacts, markContactRead, setContactPaused, getMessageMedia, getMessages, getMessageForAction, updateMessageText, deleteMessageRecord,
+  createInternalMessage, createInternalNote, deleteInternalNote, deleteOwnInternalMessage, ensureOpenConversationCycle, updateOwnInternalMessage,
   getInternalMessageMedia, listInternalContacts, listInternalMessages, listInternalNotes,
   resolveConversation, transferConversation,
   listCanned, createCanned, updateCanned, deleteCanned,
@@ -22,7 +22,7 @@ import { hashPassword, normalizeUsername, publicUser, validatePassword, verifyPa
 import { changeAppointment, createAppointment, getAvailableSlots, removeAppointment } from './calendar.js'
 import {
   flushPendingAppointmentNotifications, getWhatsAppState, logoutWhatsApp,
-  removeWhatsAppTenant, requestWhatsAppSync, sendMediaMessage, sendMessage, startWhatsApp, stopWhatsApp, syncCustomerToWhatsApp,
+  deleteWhatsAppMessage, editWhatsAppMessage, removeWhatsAppTenant, requestWhatsAppSync, sendMediaMessage, sendMessage, startWhatsApp, stopWhatsApp, syncCustomerToWhatsApp,
 } from './whatsapp.js'
 import { MAX_MEDIA_BYTES, resolveMediaPath, safeFileName } from './media.js'
 import { messageTypeForMedia, saveMediaBuffer } from './media.js'
@@ -230,6 +230,8 @@ export function createServer() {
     const listeners = {
       wa_state: (data) => Number(data?.tenantId || data?.tenant_id || currentTenantId()) === req.tenantId && write('wa_state', data),
       message: (data) => Number(data?.tenantId || data?.tenant_id || currentTenantId()) === req.tenantId && write('message', data),
+      message_edited: (data) => Number(data?.tenantId || data?.tenant_id || currentTenantId()) === req.tenantId && write('message_edited', data),
+      message_deleted: (data) => Number(data?.tenantId || data?.tenant_id || currentTenantId()) === req.tenantId && write('message_deleted', data),
       contact_update: (data) => Number(data?.tenantId || data?.tenant_id || currentTenantId()) === req.tenantId && write('contact_update', data),
       customer_update: (data) => Number(data?.tenantId || data?.tenant_id || currentTenantId()) === req.tenantId && write('customer_update', data),
       conversation_deleted: (data) => Number(data?.tenantId || data?.tenant_id || currentTenantId()) === req.tenantId && write('conversation_deleted', data),
@@ -246,6 +248,10 @@ export function createServer() {
       internal_message_deleted: (data) => {
         if (Number(data?.tenantId || data?.tenant_id || currentTenantId()) !== req.tenantId) return
         if ([Number(data?.sender_id), Number(data?.recipient_id)].includes(Number(req.user.id))) write('internal_message_deleted', data)
+      },
+      internal_message_edited: (data) => {
+        if (Number(data?.tenantId || data?.tenant_id || currentTenantId()) !== req.tenantId) return
+        if ([Number(data?.sender_id), Number(data?.recipient_id)].includes(Number(req.user.id))) write('internal_message_edited', data)
       },
     }
     for (const [event, listener] of Object.entries(listeners)) bus.on(event, listener)
@@ -576,18 +582,42 @@ export function createServer() {
     res.json({ ok: true, ...result })
   }))
   app.get('/api/messages', auth, (req, res) => res.json(getMessages(String(req.query.jid || ''), 200)))
-  app.delete('/api/messages/:id', auth, (_req, res) => {
-    res.status(405).json({ error: 'Mensagens do histórico permanente não podem ser apagadas.' })
-  })
-  app.patch('/api/messages/:id', auth, (req, res) => {
+  app.delete('/api/messages/:id', auth, safe(async (req, res) => {
+    const id = Number(req.params.id)
+    const message = getMessageForAction(id)
+    if (!message) return res.status(404).json({ error: 'Mensagem não encontrada.' })
+    if (message.direction !== 'out' || !message.external_id) return res.status(400).json({ error: 'Somente mensagens recentes enviadas por este sistema podem ser apagadas.' })
+    const sentAt = Date.parse(String(message.created_at).replace(' ', 'T') + 'Z')
+    if (!Number.isFinite(sentAt) || Date.now() - sentAt > 15 * 60 * 1000) return res.status(400).json({ error: 'O prazo de 15 minutos para apagar esta mensagem terminou.' })
+    const contact = getContact(message.jid)
+    await deleteWhatsAppMessage(contact?.transport_jid || message.jid, message.external_id)
+    if (message.media_path) {
+      const absolutePath = resolveMediaPath(message.media_path, req.tenantId)
+      if (absolutePath) fs.rmSync(absolutePath, { force: true })
+    }
+    deleteMessageRecord(id)
+    bus.emit('message_deleted', { tenantId: req.tenantId, id, jid: message.jid })
+    res.json({ ok: true })
+  }))
+  app.patch('/api/messages/:id', auth, safe(async (req, res) => {
     const id = Number(req.params.id)
     const text = String(req.body?.text ?? '').trim()
     if (!id) return res.status(400).json({ error: 'ID de mensagem inválido.' })
     if (!text) return res.status(400).json({ error: 'O texto não pode ser vazio.' })
-    const result = updateMessageText(id, text)
-    if (!result.changes) return res.status(404).json({ error: 'Mensagem não encontrada.' })
+    const message = getMessageForAction(id)
+    if (!message) return res.status(404).json({ error: 'Mensagem não encontrada.' })
+    if (message.direction !== 'out' || message.message_type !== 'text' || !message.external_id) return res.status(400).json({ error: 'Somente mensagens de texto recentes enviadas por este sistema podem ser editadas.' })
+    const sentAt = Date.parse(String(message.created_at).replace(' ', 'T') + 'Z')
+    if (!Number.isFinite(sentAt) || Date.now() - sentAt > 15 * 60 * 1000) return res.status(400).json({ error: 'O prazo de 15 minutos para editar esta mensagem terminou.' })
+    const outgoingText = message.author_name
+      ? `*${String(message.author_name).replaceAll('*', '')}*\n${text}`
+      : text
+    const contact = getContact(message.jid)
+    await editWhatsAppMessage(contact?.transport_jid || message.jid, message.external_id, outgoingText)
+    updateMessageText(id, outgoingText)
+    bus.emit('message_edited', { tenantId: req.tenantId, id, jid: message.jid, text, edited_at: new Date().toISOString() })
     res.json({ ok: true, text })
-  })
+  }))
   app.get('/api/messages/:id/media', auth, (req, res) => {
     const media = getMessageMedia(Number(req.params.id))
     if (!media?.media_path) return res.status(404).json({ error: 'Arquivo não encontrado.' })
@@ -760,7 +790,7 @@ export function createServer() {
     if (!result.ok) {
       if (result.reason === 'not_found') return res.status(404).json({ error: 'Mensagem não encontrada.' })
       if (result.reason === 'forbidden') return res.status(403).json({ error: 'Você só pode apagar suas próprias mensagens.' })
-      return res.status(400).json({ error: 'Só é possível apagar mensagens enviadas há menos de 1 minuto.' })
+      return res.status(400).json({ error: 'Só é possível apagar mensagens enviadas há menos de 15 minutos.' })
     }
     if (result.message.media_path) {
       const absolutePath = resolveMediaPath(result.message.media_path, req.tenantId)
@@ -773,6 +803,19 @@ export function createServer() {
       recipient_id: result.message.recipient_id,
     })
     res.json({ ok: true })
+  })
+  app.patch('/api/internal/messages/:id', auth, (req, res) => {
+    const text = String(req.body?.text || '').trim()
+    if (!text) return res.status(400).json({ error: 'O texto não pode ser vazio.' })
+    const result = updateOwnInternalMessage(Number(req.params.id), req.user.id, text.slice(0, 8000))
+    if (!result.ok) {
+      if (result.reason === 'not_found') return res.status(404).json({ error: 'Mensagem não encontrada.' })
+      if (result.reason === 'forbidden') return res.status(403).json({ error: 'Você só pode editar suas próprias mensagens.' })
+      if (result.reason === 'unsupported') return res.status(400).json({ error: 'Somente mensagens de texto podem ser editadas.' })
+      return res.status(400).json({ error: 'O prazo de 15 minutos para editar esta mensagem terminou.' })
+    }
+    bus.emit('internal_message_edited', result.message)
+    res.json({ ok: true, message: result.message })
   })
 
   // ---------- customer database ----------
