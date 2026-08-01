@@ -737,31 +737,30 @@ main {
   width: 100%;
   max-width: 1460px;
   margin: 0 auto;
-  padding: 108px clamp(18px, 4vw, 52px) 32px;
+  padding: 92px clamp(18px, 4vw, 52px) 32px;
 }
 
 .app-dock {
   position: fixed;
   z-index: 80;
-  top: max(14px, env(safe-area-inset-top));
-  right: max(14px, env(safe-area-inset-right));
+  top: 0;
+  right: 0;
   bottom: auto;
-  left: max(14px, env(safe-area-inset-left));
+  left: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: min(1580px, calc(100% - 28px));
-  min-height: 74px;
-  margin-inline: auto;
-  padding: 8px;
+  gap: 14px;
+  width: 100%;
+  min-height: 68px;
+  padding: 8px max(20px, env(safe-area-inset-right)) 8px max(20px, env(safe-area-inset-left));
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,.34);
-  border-radius: 28px;
+  border: 0;
+  border-bottom: 1px solid rgba(255,255,255,.3);
+  border-radius: 0;
   background: #3f7b69;
   box-shadow:
-    0 24px 70px rgba(25, 56, 65, .24),
-    0 4px 14px rgba(25, 56, 65, .12),
-    inset 0 1px 0 rgba(255,255,255,.3),
+    0 10px 28px rgba(25, 56, 65, .18),
+    inset 0 1px 0 rgba(255,255,255,.24),
     inset 0 -1px 0 rgba(16,56,47,.2);
   backdrop-filter: blur(30px) saturate(175%);
   -webkit-backdrop-filter: blur(30px) saturate(175%);
@@ -779,11 +778,12 @@ main {
 
 nav#tabs {
   position: static;
+  order: 1;
   display: flex;
   flex: 1 1 auto;
   flex-direction: row;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   width: auto;
   min-width: 0;
   height: auto;
@@ -801,20 +801,20 @@ nav#tabs button {
   position: relative;
   display: flex;
   flex: 0 0 auto;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 6px;
   width: auto;
-  min-width: 64px;
-  min-height: 56px;
-  padding: 7px 10px 6px;
+  min-width: max-content;
+  min-height: 42px;
+  padding: 7px 9px;
   border: 1px solid transparent;
-  border-radius: 18px;
+  border-radius: 10px;
   color: rgba(255,255,255,.72);
   background: transparent;
   box-shadow: none;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 720;
   line-height: 1;
   text-align: center;
@@ -826,15 +826,15 @@ nav#tabs button:hover {
   border-color: transparent;
   background: transparent;
   box-shadow: none;
-  transform: translateY(-2px);
+  transform: none;
 }
 nav#tabs button.active {
-  padding-left: 10px;
+  padding-left: 9px;
   color: #fff;
   border-color: transparent;
   background: transparent;
   box-shadow: none;
-  transform: translateY(-2px);
+  transform: none;
 }
 nav#tabs button.active::after {
   content: "";
@@ -851,9 +851,9 @@ nav#tabs button.active::after {
 }
 nav#tabs button.active .nav-icon { color: #9dffe0; }
 .nav-icon {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
   color: currentColor;
   stroke-width: 1.9;
 }
@@ -869,24 +869,12 @@ nav#tabs button.active .nav-icon { color: #9dffe0; }
 }
 
 .app-header {
-  position: static;
-  z-index: auto;
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-  height: 56px;
-  padding: 0 5px 0 9px;
-  color: #fff;
-  background: transparent;
-  border: 0;
-  border-left: 1px solid rgba(255,255,255,.2);
+  display: contents;
 }
-.brand { gap: 0; }
-.brand-logo { width: 88px; filter: brightness(0) invert(1) drop-shadow(0 4px 8px rgba(7,45,36,.18)); }
+.brand { order: 0; display: flex; flex: 0 0 auto; gap: 0; padding-right: 16px; border-right: 1px solid rgba(255,255,255,.2); }
+.brand-logo { width: 96px; filter: brightness(0) invert(1) drop-shadow(0 4px 8px rgba(7,45,36,.18)); }
 .brand-divider, .brand p { display: none; }
-.header-actions { gap: 6px; }
+.header-actions { order: 2; flex: 0 0 auto; gap: 6px; }
 .current-user { display: none; }
 .header-button {
   color: rgba(255,255,255,.88);
@@ -975,7 +963,7 @@ input:focus, textarea:focus, select:focus {
 .contact-item:hover { background: rgba(255,255,255,.48); }
 .contact-item.active { background: rgba(211,247,237,.63); box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
 .context-menu { background: rgba(249,253,253,.8); }
-.toast-region { top: 106px; bottom: auto; }
+.toast-region { top: 84px; bottom: auto; }
 .toast { background: rgba(255,255,255,.82); }
 .customer-form-card { top: 20px; }
 
@@ -992,50 +980,58 @@ input:focus, textarea:focus, select:focus {
 }
 
 @media (min-width: 781px) {
-  #tab-connection.active { height: calc(100dvh - 132px); min-height: 0; }
+  #tab-connection.active { height: calc(100dvh - 116px); min-height: 0; }
   body:has(#tab-chats.active) main, body:has(#tab-internal.active) main {
     height: 100dvh;
-    padding-top: 108px;
+    padding-top: 92px;
     padding-bottom: 24px;
   }
 }
 
 @media (max-width: 1180px) {
-  .brand { display: none; }
-  .app-header { padding-left: 7px; }
+  .app-dock { gap: 8px; padding-inline: 12px; }
+  .brand { display: flex; padding-right: 10px; }
+  .brand-logo { width: 80px; }
+  nav#tabs button { padding-inline: 7px; }
   .tenant-switcher select { min-width: 108px; }
 }
 
 @media (max-width: 780px) {
   body { padding: 0; }
-  main { padding: 132px 16px 28px; }
+  main { padding: 124px 16px 28px; }
   .app-dock {
-    top: max(8px, env(safe-area-inset-top));
-    right: max(8px, env(safe-area-inset-right));
+    top: 0;
+    right: 0;
     bottom: auto;
-    left: max(8px, env(safe-area-inset-left));
-    flex-direction: column-reverse;
+    left: 0;
+    flex-direction: column;
+    align-items: stretch;
     gap: 4px;
-    width: calc(100% - 16px);
-    padding: 6px;
-    border-radius: 24px;
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 0;
   }
-  nav#tabs { width: 100%; }
-  nav#tabs button { min-width: 62px; min-height: 53px; padding: 6px 9px 5px; font-size: 8px; }
+  nav#tabs { order: 2; width: 100%; }
+  nav#tabs button { min-width: max-content; min-height: 45px; padding: 6px 9px; font-size: 9px; }
   .app-header {
+    order: 1;
+    display: flex;
     width: 100%;
     height: 35px;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
     padding: 0 3px 3px;
     border-left: 0;
     border-bottom: 1px solid rgba(117,145,153,.16);
   }
+  .brand { padding-right: 0; border-right: 0; }
+  .brand-logo { width: 74px; }
   .header-actions { width: 100%; justify-content: flex-end; }
   .tenant-switcher { margin-right: auto; }
   .tenant-switcher select { width: min(38vw, 150px); min-width: 0; height: 31px; min-height: 31px; }
   .header-button { min-height: 30px; }
   .badge { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .toast-region { top: 124px; right: 12px; bottom: auto; width: calc(100vw - 24px); }
+  .toast-region { top: 116px; right: 12px; bottom: auto; width: calc(100vw - 24px); }
   .context-menu { top: auto !important; bottom: 14px; }
 }
 
@@ -1044,10 +1040,11 @@ input:focus, textarea:focus, select:focus {
   .app-header { height: 34px; padding: 0 2px 3px; }
   .tenant-switcher { display: flex; gap: 0; font-size: 0; }
   .tenant-switcher select { font-size: 9px; }
-  .brand, .current-user { display: none; }
+  .brand { display: flex; }
+  .current-user { display: none; }
   .badge { width: 27px; min-width: 27px; padding: 0; justify-content: center; font-size: 0; }
   nav#tabs { padding: 0; }
-  nav#tabs button { min-width: 59px; padding-inline: 7px; }
+  nav#tabs button { min-width: max-content; padding-inline: 8px; }
   .nav-icon { width: 19px; height: 19px; flex-basis: 19px; }
   .context-menu { right: 12px !important; bottom: 14px; left: 12px !important; }
 }
