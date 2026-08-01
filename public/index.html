@@ -231,6 +231,11 @@
             <button type="button" id="btn-toggle-pause"></button>
             <div class="chat-composer">
               <div id="chat-emoji-picker" class="emoji-picker hidden" aria-label="Emojis"></div>
+              <div class="audio-preview" aria-label="Prévia do áudio gravado">
+                <audio id="chat-audio-preview-player" controls preload="metadata"></audio>
+                <button type="button" id="chat-audio-discard" class="composer-icon secondary" aria-label="Descartar áudio" title="Descartar áudio">×</button>
+                <button type="button" id="chat-audio-send" class="composer-icon" aria-label="Enviar áudio" title="Enviar áudio">↑</button>
+              </div>
               <button type="button" id="chat-attach" class="composer-icon secondary" aria-label="Anexar arquivo" title="Anexar imagem, vídeo, GIF ou documento">📎</button>
               <input id="chat-file-input" class="hidden" type="file" accept="image/*,video/*,.webp,.gif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z" />
               <button type="button" id="chat-gif" class="composer-icon secondary" aria-label="Enviar GIF" title="Enviar GIF">GIF</button>
@@ -260,6 +265,11 @@
           <div id="internal-messages"><div class="empty-state"><span><svg class="ui-icon"><use href="icons.svg#i-users" /></svg></span><b>Nenhuma conversa selecionada</b><small>Escolha um usuário ao lado para conversar.</small></div></div>
           <form id="internal-send-form" class="hidden">
             <div id="internal-emoji-picker" class="emoji-picker hidden" aria-label="Emojis"></div>
+            <div class="audio-preview" aria-label="Prévia do áudio gravado">
+              <audio id="internal-audio-preview-player" controls preload="metadata"></audio>
+              <button type="button" id="internal-audio-discard" class="composer-icon secondary" aria-label="Descartar áudio" title="Descartar áudio">×</button>
+              <button type="button" id="internal-audio-send" class="composer-icon" aria-label="Enviar áudio" title="Enviar áudio">↑</button>
+            </div>
             <input id="internal-file-input" class="hidden" type="file" accept="image/*,video/*,.webp,.gif,.pdf,.txt" />
             <button type="button" id="internal-attach" class="composer-icon secondary" aria-label="Anexar arquivo">📎</button>
             <button type="button" id="internal-gif" class="composer-icon secondary" aria-label="Enviar GIF">GIF</button>
