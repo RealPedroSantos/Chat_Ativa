@@ -1009,15 +1009,23 @@ input:focus, textarea:focus, select:focus {
 
 #login-overlay {
   background:
-    radial-gradient(circle at 18% 12%, rgba(37,216,175,.32), transparent 28rem),
-    radial-gradient(circle at 88% 84%, rgba(85,120,237,.26), transparent 30rem),
-    linear-gradient(145deg, #102a2c, #111827);
+    radial-gradient(circle at 18% 12%, rgba(37,216,175,.22), transparent 28rem),
+    radial-gradient(circle at 88% 84%, rgba(85,120,237,.16), transparent 30rem),
+    linear-gradient(145deg, #edf9f6, #f2f5ff);
 }
 #login-overlay .card {
+  padding-right: clamp(28px, 4.5vw, 68px);
+  padding-left: clamp(28px, 4.5vw, 68px);
   border-color: rgba(255,255,255,.48);
-  background: rgba(249,253,253,.75);
+  background: #fff;
   box-shadow: 0 34px 90px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.92);
 }
+#login-overlay input {
+  padding-right: 20px;
+  padding-left: 20px;
+  border-radius: 100px;
+}
+#login-overlay button[type=submit] { border-radius: 100px; }
 
 @media (min-width: 781px) {
   #tab-connection.active { height: calc(100dvh - 116px); min-height: 0; }
