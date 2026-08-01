@@ -391,10 +391,32 @@ export async function sendMessage(jid, text, source = 'human', conversationJid =
   } catch {
     // Presence is cosmetic.
   }
-  await session.sock.sendMessage(jid, { text })
-  const stored = addMessage(conversationJid, 'out', text, source, { authorUserId, authorName, messageType })
+  const sent = await session.sock.sendMessage(jid, { text })
+  const stored = addMessage(conversationJid, 'out', text, source, {
+    authorUserId,
+    authorName,
+    messageType,
+    externalId: sent?.key?.id || null,
+    externalTimestamp: new Date().toISOString(),
+  })
   bus.emit('message', stored)
   return stored
+}
+
+export async function editWhatsAppMessage(jid, externalId, text) {
+  const session = getSession()
+  if (!session.sock || session.state.status !== 'connected') throw new Error('WhatsApp não está conectado nesta empresa')
+  if (!externalId) throw new Error('Esta mensagem antiga não possui identificação para edição no WhatsApp.')
+  const key = { remoteJid: jid, fromMe: true, id: externalId }
+  await session.sock.sendMessage(jid, { text, edit: key })
+}
+
+export async function deleteWhatsAppMessage(jid, externalId) {
+  const session = getSession()
+  if (!session.sock || session.state.status !== 'connected') throw new Error('WhatsApp não está conectado nesta empresa')
+  if (!externalId) throw new Error('Esta mensagem antiga não possui identificação para exclusão no WhatsApp.')
+  const key = { remoteJid: jid, fromMe: true, id: externalId }
+  await session.sock.sendMessage(jid, { delete: key })
 }
 
 export async function sendMediaMessage(jid, {
@@ -428,7 +450,7 @@ export async function sendMediaMessage(jid, {
   } else {
     content = { document: buffer, mimetype: mimeType, fileName: safeName, caption: String(caption || '').trim() }
   }
-  await session.sock.sendMessage(jid, content)
+  const sent = await session.sock.sendMessage(jid, content)
   const saved = saveMediaBuffer({
     tenantId: session.tenantId,
     buffer,
@@ -448,6 +470,8 @@ export async function sendMediaMessage(jid, {
     isVoiceNote: Boolean(voiceNote),
     authorUserId,
     authorName,
+    externalId: sent?.key?.id || null,
+    createdAt: new Date().toISOString(),
   })
   bus.emit('message', stored)
   return stored
