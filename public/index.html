@@ -83,6 +83,27 @@
           </details>
         </aside>
       </div>
+      <div class="card integrations-card" data-master>
+        <div class="page-heading">
+          <div>
+            <span class="eyebrow">Integrações oficiais</span>
+            <h3>WhatsApp Cloud API + n8n</h3>
+            <p>Receba mensagens pela API oficial da Meta e encaminhe eventos para fluxos de atendimento e automação no n8n.</p>
+          </div>
+        </div>
+        <div class="integration-status-grid">
+          <div><span>WhatsApp Cloud API</span><strong id="cloud-api-status">Verificando…</strong></div>
+          <div><span>Webhook da Meta</span><strong id="cloud-webhook-status">Verificando…</strong></div>
+          <div><span>n8n</span><strong id="n8n-status">Verificando…</strong></div>
+          <div><span>Backend Chat Ativa</span><strong id="integration-backend-status">Verificando…</strong></div>
+        </div>
+        <div class="integration-endpoints">
+          <label>Callback para cadastrar na Meta <code id="cloud-webhook-url"></code></label>
+          <label>Endpoint autenticado para enviar mensagens <code id="cloud-send-url"></code></label>
+          <label>Endpoint autenticado para disparar o n8n <code id="n8n-automation-url"></code></label>
+        </div>
+        <p class="muted">As credenciais ficam somente nas variáveis protegidas do ambiente. A conexão atual por QR continua disponível para instalações em servidor próprio.</p>
+      </div>
     </section>
 
     <!-- Intelligent calendar -->

@@ -38,6 +38,11 @@ import { syncPromptKnowledge } from './prompt-knowledge.js'
 import { bus } from './bus.js'
 import { currentTenantId, runWithTenant } from './tenant-context.js'
 import { importWhatsAppExport } from './history-import.js'
+import {
+  integrationStatus, isIntegrationRequestAuthorized,
+  verifyWebhookChallenge, verifyWhatsAppSignature,
+} from './integration-core.js'
+import { processCloudWebhook } from './whatsapp-cloud.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const tokens = new Map()
@@ -127,8 +132,35 @@ function humanMessageText(text, user) {
 
 export function createServer() {
   const app = express()
-  app.use(express.json())
+  app.use(express.json({
+    limit: '2mb',
+    verify(req, _res, buffer) { req.rawBody = Buffer.from(buffer) },
+  }))
   app.use(express.static(path.join(__dirname, '..', 'public')))
+
+  // Callback público registrado na Meta. O desafio usa um token compartilhado
+  // e cada evento POST é autenticado pela assinatura HMAC do App Secret.
+  app.get('/api/integrations/whatsapp/webhook', (req, res) => {
+    const challenge = verifyWebhookChallenge(req.query || {})
+    return challenge === null
+      ? res.status(403).send('Webhook verification failed')
+      : res.status(200).send(challenge)
+  })
+  app.post('/api/integrations/whatsapp/webhook', safe(async (req, res) => {
+    const signature = String(req.headers['x-hub-signature-256'] || '')
+    if (!verifyWhatsAppSignature(req.rawBody || Buffer.alloc(0), signature)) {
+      return res.status(401).json({ ok: false, error: 'invalid_signature' })
+    }
+    res.json({ ok: true, ...(await processCloudWebhook(req.body)) })
+  }))
+  // Relay autenticado usado quando a Meta chama primeiro a função da Vercel.
+  app.post('/api/integrations/whatsapp/inbound', safe(async (req, res) => {
+    if (!isIntegrationRequestAuthorized(req)) {
+      return res.status(401).json({ ok: false, error: 'unauthorized' })
+    }
+    res.json({ ok: true, ...(await processCloudWebhook(req.body)) })
+  }))
+  app.get('/api/integrations/status', (_req, res) => res.json({ ok: true, ...integrationStatus() }))
 
   function sessionUser(req) {
     const token = req.headers['x-auth-token'] || req.query.token

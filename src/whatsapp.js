@@ -13,6 +13,7 @@ import {
 import { messageTypeForMedia, removeTenantMedia, safeFileName, saveMediaBuffer } from './media.js'
 import { syncWhatsAppContactToCustomer } from './customers.js'
 import { currentTenantId, runWithTenant } from './tenant-context.js'
+import { cloudApiEnabled, cloudApiState, sendCloudMessage } from './whatsapp-cloud.js'
 
 const {
   useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion,
@@ -72,6 +73,7 @@ function getSession(tenantId = currentTenantId()) {
 }
 
 export function getWhatsAppState(tenantId = currentTenantId()) {
+  if (cloudApiEnabled()) return { tenantId: Number(tenantId), ...cloudApiState() }
   return { ...getSession(tenantId).state }
 }
 
@@ -381,6 +383,9 @@ export async function sendMessage(jid, text, source = 'human', conversationJid =
   authorName = null,
   messageType = 'text',
 } = {}) {
+  if (cloudApiEnabled()) {
+    return sendCloudMessage(jid, text, source, conversationJid, { authorUserId, authorName, messageType })
+  }
   const session = getSession()
   if (!session.sock || session.state.status !== 'connected') throw new Error('WhatsApp não está conectado nesta empresa')
   try {
@@ -610,6 +615,7 @@ function scheduleReconnect(session, delay) {
 }
 
 export async function startWhatsApp(tenantId = currentTenantId()) {
+  if (cloudApiEnabled()) return { tenantId: Number(tenantId), ...cloudApiState() }
   const session = getSession(tenantId)
   if (session.starting) return
   session.suspended = false
@@ -731,5 +737,9 @@ export async function startWhatsApp(tenantId = currentTenantId()) {
 }
 
 export function startAllWhatsApps() {
+  if (cloudApiEnabled()) {
+    bus.emit('wa_state', { tenantId: Number(process.env.WHATSAPP_TENANT_ID || 1), ...cloudApiState() })
+    return
+  }
   for (const tenant of listTenants().filter((item) => item.active)) startWhatsApp(tenant.id)
 }

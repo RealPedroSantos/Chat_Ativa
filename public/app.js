@@ -397,7 +397,9 @@ function renderWaState(wa) {
   const [cls, label, text] = map[wa.status] || map.disconnected
   badge.className = 'badge ' + cls
   badge.textContent = label
-  statusText.textContent = text
+  statusText.textContent = wa.official && wa.status === 'connected'
+    ? 'WhatsApp Business Platform conectado pela API oficial da Meta.'
+    : text
   $('#conn-kicker').textContent = wa.status === 'connected'
     ? 'Canal ativo'
     : wa.status === 'qr'
@@ -410,9 +412,43 @@ function renderWaState(wa) {
   } else {
     qrImg.classList.add('hidden')
   }
-  $('#conn-user').textContent = wa.user ? `Número conectado: ${wa.user.split(':')[0].replace('@s.whatsapp.net', '')}` : ''
-  logoutBtn.classList.toggle('hidden', wa.status !== 'connected')
-  renderWaSync(wa)
+  $('#conn-user').textContent = wa.user
+    ? `${wa.official ? 'Número oficial' : 'Número conectado'}: ${wa.user.split(':')[0].replace('@s.whatsapp.net', '')}`
+    : ''
+  logoutBtn.classList.toggle('hidden', wa.status !== 'connected' || wa.official)
+  $('#wa-sync-panel')?.classList.toggle('hidden', Boolean(wa.official))
+  if (!wa.official) renderWaSync(wa)
+  loadIntegrationStatus()
+}
+
+let integrationStatusLoaded = false
+async function loadIntegrationStatus() {
+  if (integrationStatusLoaded) return
+  integrationStatusLoaded = true
+  const render = (selector, configured) => {
+    const element = $(selector)
+    if (!element) return
+    element.textContent = configured ? 'Configurado' : 'Aguardando credenciais'
+    element.className = configured ? 'ok' : 'warn'
+  }
+  try {
+    const response = await fetch('/api/integrations/status', { cache: 'no-store' })
+    if (!response.ok) throw new Error('status unavailable')
+    const status = await response.json()
+    render('#cloud-api-status', status.whatsapp?.configured)
+    render('#cloud-webhook-status', status.whatsapp?.webhookConfigured)
+    render('#n8n-status', status.n8n?.configured)
+    render('#integration-backend-status', status.backend?.configured)
+  } catch {
+    integrationStatusLoaded = false
+    for (const selector of ['#cloud-api-status', '#cloud-webhook-status', '#n8n-status', '#integration-backend-status']) {
+      const element = $(selector)
+      if (element) { element.textContent = 'Indisponível'; element.className = 'warn' }
+    }
+  }
+  if ($('#cloud-webhook-url')) $('#cloud-webhook-url').textContent = `${location.origin}/api/integrations/whatsapp/webhook`
+  if ($('#cloud-send-url')) $('#cloud-send-url').textContent = `${location.origin}/api/integrations/whatsapp/send`
+  if ($('#n8n-automation-url')) $('#n8n-automation-url').textContent = `${location.origin}/api/integrations/n8n`
 }
 
 function renderWaSync(wa) {

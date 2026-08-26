@@ -5,6 +5,8 @@ A self-hosted WhatsApp customer-service bot with a web dashboard. Connect by sca
 ## Features
 
 - **QR code login** — connects through the WhatsApp Web protocol ([Baileys](https://github.com/WhiskeySockets/Baileys)); scan the code from the dashboard.
+- **WhatsApp Business Platform (Cloud API)** — official Meta webhook with signature validation, text/template sending and delivery-status events.
+- **n8n automations** — signed outbound events and authenticated endpoints for workflows to send WhatsApp messages or trigger automations.
 - **Web dashboard** (pt-BR) — connection status, live conversations, configuration, canned responses, rules, and knowledge base.
 - **Reply pipeline** (in priority order):
   1. **Rules** — pattern matching (contains / exact / starts with / regex) that can reply or **pause the bot** and hand off to a human.
@@ -53,9 +55,20 @@ This app needs a **long-running Node.js process** (persistent WebSocket to Whats
 
 Keep the `data/` directory persistent — it holds the WhatsApp session (so you don't re-scan the QR) and the SQLite database.
 
+### Official WhatsApp API and n8n
+
+The Vercel deployment exposes these serverless endpoints:
+
+- `GET/POST /api/integrations/whatsapp/webhook` — Meta callback and signed events.
+- `POST /api/integrations/whatsapp/send` — authenticated outbound text, template or raw Cloud API message.
+- `POST /api/integrations/n8n` — authenticated trigger forwarded to the configured n8n webhook.
+- `GET /api/integrations/status` — redacted configuration status; secrets are never returned.
+
+Set the variables documented in `.env.example` in Vercel and in the persistent backend. Use the same random `CHAT_ATIVA_INTEGRATION_KEY` in both. Point `CHAT_ATIVA_BACKEND_URL` to the persistent service and register `https://chat-ativa.vercel.app/api/integrations/whatsapp/webhook` as the callback in Meta. Set `WHATSAPP_CHANNEL=cloud_api` in the backend to make the existing inbox and reply pipeline use the official channel. Leave it empty to continue using QR/Baileys.
+
 ## ⚠️ Important notice
 
-This bot uses the unofficial WhatsApp Web protocol. WhatsApp's terms of service prohibit automated/bulk messaging, and numbers can be **banned** for abuse. Use a dedicated number, reply only to customers who message you first, and avoid mass sending. For mission-critical operations consider the official WhatsApp Business Platform (Cloud API) — it doesn't use QR login but is ToS-safe.
+The QR option uses the unofficial WhatsApp Web protocol and should not be used for bulk messaging. For production, prefer the included official WhatsApp Business Platform integration and follow Meta's template, consent and messaging-window policies.
 
 ## Project structure
 
