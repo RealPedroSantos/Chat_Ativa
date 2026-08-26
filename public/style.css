@@ -1299,13 +1299,25 @@ input[type=text]:focus, input[type=tel]:focus, input[type=password]:focus, input
   .usage-table-card th, .usage-table-card td { padding: 6px; }
   .usage-report-footer { break-inside: avoid; }
 }
-.integrations-card { margin-top: 18px; }
-.integration-status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
-.integration-status-grid > div { padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: rgba(255,255,255,.5); }
-.integration-status-grid span { display: block; color: var(--muted); font-size: .82rem; margin-bottom: 5px; }
-.integration-status-grid strong { font-size: .9rem; }
-.integration-endpoints { display: grid; gap: 10px; }
-.integration-endpoints label { display: grid; gap: 5px; color: var(--muted); font-size: .82rem; }
-.integration-endpoints code { overflow-wrap: anywhere; color: var(--text); background: var(--surface-soft, rgba(0,0,0,.04)); padding: 9px 11px; border-radius: 10px; }
-@media (max-width: 900px) { .integration-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 520px) { .integration-status-grid { grid-template-columns: 1fr; } }
+.integrations-card { margin-top: 18px; overflow: hidden; }
+.integration-status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px; margin: 18px 0 22px; }
+.integration-status-grid > div { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 10px; min-width: 0; min-height: 94px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: rgba(255,255,255,.5); }
+.integration-status-grid span { display: block; margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.35; }
+.integration-status-grid strong,
+.integration-status-grid strong.warn {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 30px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 9px;
+  font-size: .82rem;
+  line-height: 1.2;
+  white-space: normal;
+}
+.integration-status-grid strong.ok { padding: 6px 0; }
+.integration-endpoints { display: grid; gap: 12px; min-width: 0; }
+.integration-endpoints label { display: grid; gap: 6px; min-width: 0; color: var(--muted); font-size: .82rem; }
+.integration-endpoints code { display: block; min-width: 0; padding: 9px 11px; overflow-wrap: anywhere; border-radius: 10px; color: var(--text); background: var(--surface-soft, rgba(0,0,0,.04)); font-size: .78rem; line-height: 1.45; }
