@@ -1004,6 +1004,12 @@ function renderContactList() {
     const haystack = `${contact.name || ''} ${contact.jid.split('@')[0]}`.toLocaleLowerCase('pt-BR')
     return !query || haystack.includes(query)
   })
+  const count = $('#contacts-panel-count')
+  if (count) {
+    const unread = contacts.reduce((total, contact) => total + (Number(contact.unread_count) > 0 ? 1 : 0), 0)
+    count.textContent = unread ? `${unread} nova${unread === 1 ? '' : 's'}` : `${contacts.length}`
+    count.className = unread ? 'contacts-count unread' : 'contacts-count'
+  }
   list.innerHTML = visible.length ? '' : `<div class="empty-state"><span><svg class="ui-icon"><use href="icons.svg#${contacts.length ? 'i-search' : 'i-inbox'}" /></svg></span><b>${contacts.length ? 'Nenhuma conversa encontrada' : 'Nenhuma conversa ainda'}</b><small>${contacts.length ? 'Tente buscar por outro nome ou número.' : 'As novas mensagens aparecerão aqui.'}</small></div>`
   for (const c of visible) {
     const div = document.createElement('div')
