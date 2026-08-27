@@ -57,14 +57,18 @@ Keep the `data/` directory persistent — it holds the WhatsApp session (so you 
 
 ### Official WhatsApp API and n8n
 
-The Vercel deployment exposes these serverless endpoints:
+The Vercel deployment exposes these endpoints:
 
 - `GET/POST /api/integrations/whatsapp/webhook` — Meta callback and signed events.
-- `POST /api/integrations/whatsapp/send` — authenticated outbound text, template or raw Cloud API message.
+- `POST /api/integrations/whatsapp/send` — authenticated outbound text message through the tenant's active QR or Cloud API channel. JSON: `{ "to": "5511999999999", "text": "Olá" }`.
 - `POST /api/integrations/n8n` — authenticated trigger forwarded to the configured n8n webhook.
 - `GET /api/integrations/status` — redacted configuration status; secrets are never returned.
 
-Set the variables documented in `.env.example` in Vercel and in the persistent backend. Use the same random `CHAT_ATIVA_INTEGRATION_KEY` in both. Point `CHAT_ATIVA_BACKEND_URL` to the persistent service and register `https://chat-ativa.vercel.app/api/integrations/whatsapp/webhook` as the callback in Meta. Set `WHATSAPP_CHANNEL=cloud_api` in the backend to make the existing inbox and reply pipeline use the official channel. Leave it empty to continue using QR/Baileys.
+In **Conexão → WhatsApp Cloud API + n8n**, an account administrator can paste the n8n Webhook Production URL, enable inbound delivery, and generate or revoke the account's `Chat Ativa Integration Key`. The raw key is shown only once; only its SHA-256 hash is stored. In n8n, call the send endpoint with `Authorization: Bearer <key>`.
+
+Inbound events keep the familiar WhatsApp webhook fields: `messages[0].from` (phone), `contacts[0].profile.name` (name), and `messages[0].text.body` (text). The dashboard shows these instructions beside the configuration.
+
+Set the Meta variables documented in `.env.example` in Vercel and in the persistent backend. Point `CHAT_ATIVA_BACKEND_URL` to the persistent service and register `https://chat-ativa.vercel.app/api/integrations/whatsapp/webhook` as the callback in Meta. Set `WHATSAPP_CHANNEL=cloud_api` in the backend to make the existing inbox and reply pipeline use the official channel. Leave it empty to continue using QR/Baileys. `CHAT_ATIVA_INTEGRATION_KEY` remains available only as a backwards-compatible server-to-server key; new n8n setups should generate their tenant key in the dashboard.
 
 ## ⚠️ Important notice
 

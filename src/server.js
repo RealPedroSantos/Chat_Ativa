@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import {
   countUsers, createUser, deleteUser, getUserById, getUserByUsername, listUsers, updateUser, updateUserPassword,
   createTenant, deleteTenants, getTenant, listTenants, updateTenant,
-  getSetting, getSettings, setSetting, updateSettings, getContact, listContacts, markContactRead, setContactPaused, getMessageMedia, getMessages, getMessageForAction, updateMessageText, deleteMessageRecord,
+  deleteSetting, findTenantByIntegrationKeyHash, getSetting, getSettings, setSetting, updateSettings, getContact, listContacts, markContactRead, setContactPaused, getMessageMedia, getMessages, getMessageForAction, updateMessageText, deleteMessageRecord, upsertContact,
   createInternalMessage, createInternalNote, deleteInternalNote, deleteOwnInternalMessage, ensureOpenConversationCycle, updateOwnInternalMessage,
   getInternalMessageMedia, listInternalContacts, listInternalMessages, listInternalNotes,
   resolveConversation, transferConversation,
@@ -39,7 +39,7 @@ import { bus } from './bus.js'
 import { currentTenantId, runWithTenant } from './tenant-context.js'
 import { importWhatsAppExport } from './history-import.js'
 import {
-  integrationStatus, isIntegrationRequestAuthorized,
+  createIntegrationKey, hashIntegrationKey, integrationKeyFromRequest, integrationStatus, isIntegrationRequestAuthorized,
   verifyWebhookChallenge, verifyWhatsAppSignature,
 } from './integration-core.js'
 import { processCloudWebhook } from './whatsapp-cloud.js'
@@ -51,6 +51,7 @@ function publicSettings() {
   const settings = getSettings()
   for (const provider of EXTERNAL_AI_PROVIDERS) delete settings[AI_PROVIDERS[provider].apiKeySetting]
   delete settings.giphy_api_key
+  delete settings.integration_api_key_hash
   return settings
 }
 
@@ -130,6 +131,24 @@ function humanMessageText(text, user) {
   return `*${String(user?.display_name || 'Atendente').replaceAll('*', '')}*\n${clean}`
 }
 
+function normalizedWebhookUrl(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  try {
+    const url = new URL(raw)
+    if (!['https:', 'http:'].includes(url.protocol)) throw new Error('protocol')
+    return url.toString()
+  } catch {
+    throw new Error('Informe uma URL HTTP ou HTTPS válida para o webhook do n8n.')
+  }
+}
+
+function integrationPhone(value) {
+  const phone = String(value || '').replace(/\D/g, '')
+  if (phone.length < 8 || phone.length > 15) throw new Error('Informe o telefone com DDI, somente números.')
+  return phone
+}
+
 export function createServer() {
   const app = express()
   app.use(express.json({
@@ -200,6 +219,69 @@ export function createServer() {
       next()
     })
   }
+
+  // ---------- n8n / API por empresa ----------
+  app.get('/api/integrations/config', accountAdmin, (_req, res) => {
+    const webhookUrl = getSetting('n8n_webhook_url') || ''
+    res.json({
+      ok: true,
+      keyConfigured: Boolean(getSetting('integration_api_key_hash')),
+      n8nEnabled: getSetting('n8n_enabled') === 'true',
+      n8nWebhookUrl: webhookUrl,
+      sendPath: '/api/integrations/whatsapp/send',
+    })
+  })
+
+  app.put('/api/integrations/config', accountAdmin, (req, res) => {
+    const n8nWebhookUrl = normalizedWebhookUrl(req.body?.n8nWebhookUrl)
+    const n8nEnabled = Boolean(req.body?.n8nEnabled)
+    if (n8nEnabled && !n8nWebhookUrl) return res.status(400).json({ error: 'Informe o webhook de produção do n8n antes de ativar.' })
+    setSetting('n8n_webhook_url', n8nWebhookUrl)
+    setSetting('n8n_enabled', n8nEnabled ? 'true' : 'false')
+    res.json({ ok: true, n8nEnabled, n8nWebhookUrl })
+  })
+
+  app.post('/api/integrations/key', accountAdmin, (_req, res) => {
+    const key = createIntegrationKey()
+    setSetting('integration_api_key_hash', hashIntegrationKey(key))
+    res.status(201).json({
+      ok: true,
+      key,
+      warning: 'Copie esta chave agora. Por segurança, ela não será exibida novamente.',
+    })
+  })
+
+  app.delete('/api/integrations/key', accountAdmin, (_req, res) => {
+    deleteSetting('integration_api_key_hash')
+    res.json({ ok: true, keyConfigured: false })
+  })
+
+  // Endpoint chamado pelo node HTTP Request do n8n. A chave identifica e
+  // isola a empresa; o transporte ativo pode ser QR Code ou Cloud API oficial.
+  app.post('/api/integrations/whatsapp/send', safe(async (req, res) => {
+    const providedKey = integrationKeyFromRequest(req)
+    const tenant = providedKey
+      ? findTenantByIntegrationKeyHash(hashIntegrationKey(providedKey))
+        || (isIntegrationRequestAuthorized(req) ? getTenant(Number(process.env.WHATSAPP_TENANT_ID || 1)) : null)
+      : null
+    if (!tenant) return res.status(401).json({ ok: false, error: 'unauthorized', message: 'Chave de integração inválida.' })
+    const phone = integrationPhone(req.body?.to)
+    const text = String(req.body?.text || '').trim()
+    if (!text) return res.status(400).json({ ok: false, error: 'invalid_message', message: 'Informe o campo text.' })
+    if (text.length > 4096) return res.status(400).json({ ok: false, error: 'invalid_message', message: 'A mensagem pode ter no máximo 4096 caracteres.' })
+    const result = await runWithTenant(tenant.id, async () => {
+      const jid = `${phone}@s.whatsapp.net`
+      upsertContact(jid, phone, jid)
+      ensureOpenConversationCycle(jid)
+      const message = await sendMessage(jid, text, 'n8n', jid)
+      return { message, wa: getWhatsAppState() }
+    })
+    res.json({
+      ok: true,
+      message: { id: result.message?.id || null, to: phone, text },
+      provider: result.wa?.provider || (result.wa?.official ? 'cloud_api' : 'qr'),
+    })
+  }))
 
   // ---------- authentication ----------
   app.get('/api/auth-status', (req, res) => {

@@ -11,6 +11,7 @@ import { aiConfigured, generateReply } from './ai.js'
 import { generateInternalReply, shouldPrioritizeInternalFlow } from './ai-interna.js'
 import { captureAiPendingNote, captureSmartNote } from './notes.js'
 import { bus } from './bus.js'
+import { forwardIncomingToTenantN8n } from './n8n-tenant.js'
 
 function normalize(text) {
   return text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
@@ -143,6 +144,10 @@ export async function handleIncoming({
     bus.emit('message', stored)
   }
   bus.emit('contact_update', { jid })
+  if (stored) {
+    forwardIncomingToTenantN8n({ jid, name, text, storedMessage: stored })
+      .catch((error) => console.error('[n8n] erro ao entregar mensagem:', error.message))
+  }
 
   // Replies from an internal recipient (for example, Alex responding SIM/NÃO)
   // must continue the original customer's flow before normal bot rules run.

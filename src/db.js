@@ -553,6 +553,8 @@ const DEFAULT_SETTINGS = {
   attendant_name_enabled: 'true',
   resolved_message: 'Atendimento concluído por {atendente}. Se precisar de algo mais, é só enviar uma nova mensagem.',
   transfer_message: 'Seu atendimento foi transferido de {atendente} para {novo_atendente}.',
+  n8n_enabled: 'false',
+  n8n_webhook_url: '',
 }
 
 // ---------- tenants / commercial accounts ----------
@@ -640,6 +642,7 @@ const getSettingStmt = db.prepare('SELECT value FROM settings WHERE tenant_id = 
 const setSettingStmt = db.prepare(
   'INSERT INTO settings (tenant_id, key, value) VALUES (?, ?, ?) ON CONFLICT(tenant_id, key) DO UPDATE SET value = excluded.value'
 )
+const deleteSettingStmt = db.prepare('DELETE FROM settings WHERE tenant_id = ? AND key = ?')
 const getGlobalSettingStmt = db.prepare('SELECT value FROM global_settings WHERE key = ?')
 const setGlobalSettingStmt = db.prepare(
   'INSERT INTO global_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
@@ -663,6 +666,22 @@ export function getSetting(key) {
 export function setSetting(key, value) {
   if (GLOBAL_SECRET_SETTINGS.has(key)) return setGlobalSettingStmt.run(key, String(value))
   setSettingStmt.run(currentTenantId(), key, String(value))
+}
+
+export function deleteSetting(key) {
+  if (GLOBAL_SECRET_SETTINGS.has(key)) return setGlobalSettingStmt.run(key, '')
+  return deleteSettingStmt.run(currentTenantId(), key)
+}
+
+export function findTenantByIntegrationKeyHash(hash) {
+  if (!hash) return null
+  return db.prepare(`
+    SELECT t.*
+    FROM settings s
+    JOIN tenants t ON t.id = s.tenant_id
+    WHERE s.key = 'integration_api_key_hash' AND s.value = ? AND t.active = 1
+    LIMIT 1
+  `).get(String(hash)) || null
 }
 
 export function getSettings() {

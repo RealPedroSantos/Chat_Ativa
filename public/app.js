@@ -422,7 +422,32 @@ function renderWaState(wa) {
 }
 
 let integrationStatusLoaded = false
+let integrationKeyConfigured = false
+
+function renderN8nConfig(config) {
+  integrationKeyConfigured = Boolean(config.keyConfigured)
+  $('#n8n-webhook-url').value = config.n8nWebhookUrl || ''
+  $('#n8n-enabled').checked = Boolean(config.n8nEnabled)
+  $('#btn-generate-integration-key').textContent = integrationKeyConfigured ? 'Gerar nova chave' : 'Gerar chave'
+  $('#btn-revoke-integration-key').classList.toggle('hidden', !integrationKeyConfigured)
+  const n8nStatus = $('#n8n-status')
+  if (config.n8nEnabled && config.n8nWebhookUrl) {
+    n8nStatus.textContent = 'Ativo'
+    n8nStatus.className = 'ok'
+  } else if (config.n8nWebhookUrl) {
+    n8nStatus.textContent = 'Configurado · pausado'
+    n8nStatus.className = 'warn'
+  } else {
+    n8nStatus.textContent = 'Aguardando webhook'
+    n8nStatus.className = 'warn'
+  }
+  const keyStatus = $('#integration-backend-status')
+  keyStatus.textContent = integrationKeyConfigured ? 'Configurada' : 'Não configurada'
+  keyStatus.className = integrationKeyConfigured ? 'ok' : 'warn'
+}
+
 async function loadIntegrationStatus() {
+  if (!['super_admin', 'admin'].includes(CURRENT_USER?.role)) return
   if (integrationStatusLoaded) return
   integrationStatusLoaded = true
   const render = (selector, configured) => {
@@ -431,25 +456,102 @@ async function loadIntegrationStatus() {
     element.textContent = configured ? 'Configurado' : 'Aguardando credenciais'
     element.className = configured ? 'ok' : 'warn'
   }
-  try {
-    const response = await fetch('/api/integrations/status', { cache: 'no-store' })
-    if (!response.ok) throw new Error('status unavailable')
-    const status = await response.json()
-    render('#cloud-api-status', status.whatsapp?.configured)
-    render('#cloud-webhook-status', status.whatsapp?.webhookConfigured)
-    render('#n8n-status', status.n8n?.configured)
-    render('#integration-backend-status', status.backend?.configured)
-  } catch {
+  const [environment, account] = await Promise.allSettled([
+    fetch('/api/integrations/status', { cache: 'no-store' }).then((response) => {
+      if (!response.ok) throw new Error('status unavailable')
+      return response.json()
+    }),
+    api('/api/integrations/config'),
+  ])
+  if (environment.status === 'fulfilled') {
+    render('#cloud-api-status', environment.value.whatsapp?.configured)
+    render('#cloud-webhook-status', environment.value.whatsapp?.webhookConfigured)
+  } else {
+    for (const selector of ['#cloud-api-status', '#cloud-webhook-status']) {
+      const element = $(selector)
+      if (element) { element.textContent = 'Indisponível'; element.className = 'warn' }
+    }
+  }
+  if (account.status === 'fulfilled') renderN8nConfig(account.value)
+  else {
     integrationStatusLoaded = false
-    for (const selector of ['#cloud-api-status', '#cloud-webhook-status', '#n8n-status', '#integration-backend-status']) {
+    for (const selector of ['#n8n-status', '#integration-backend-status']) {
       const element = $(selector)
       if (element) { element.textContent = 'Indisponível'; element.className = 'warn' }
     }
   }
   if ($('#cloud-webhook-url')) $('#cloud-webhook-url').textContent = `${location.origin}/api/integrations/whatsapp/webhook`
   if ($('#cloud-send-url')) $('#cloud-send-url').textContent = `${location.origin}/api/integrations/whatsapp/send`
-  if ($('#n8n-automation-url')) $('#n8n-automation-url').textContent = `${location.origin}/api/integrations/n8n`
+  if ($('#n8n-send-guide-url')) $('#n8n-send-guide-url').textContent = `${location.origin}/api/integrations/whatsapp/send`
 }
+
+$('#n8n-config-form').addEventListener('submit', async (event) => {
+  event.preventDefault()
+  const submit = event.submitter || event.target.querySelector('button[type=submit]')
+  submit.disabled = true
+  try {
+    const config = await api('/api/integrations/config', {
+      method: 'PUT',
+      body: JSON.stringify({
+        n8nWebhookUrl: $('#n8n-webhook-url').value.trim(),
+        n8nEnabled: $('#n8n-enabled').checked,
+      }),
+    })
+    renderN8nConfig({ ...config, keyConfigured: integrationKeyConfigured })
+    notify('Configuração do n8n salva.')
+  } catch (error) {
+    notify(error.message, 'error')
+  } finally {
+    submit.disabled = false
+  }
+})
+
+$('#btn-generate-integration-key').addEventListener('click', async () => {
+  if (integrationKeyConfigured && !confirm('Gerar uma nova chave? A chave atual deixará de funcionar imediatamente.')) return
+  const button = $('#btn-generate-integration-key')
+  button.disabled = true
+  try {
+    const result = await api('/api/integrations/key', { method: 'POST' })
+    $('#integration-key-value').value = result.key
+    $('#integration-key-reveal').classList.remove('hidden')
+    renderN8nConfig({
+      keyConfigured: true,
+      n8nEnabled: $('#n8n-enabled').checked,
+      n8nWebhookUrl: $('#n8n-webhook-url').value.trim(),
+    })
+    notify('Chave criada. Copie e guarde agora.')
+  } catch (error) {
+    notify(error.message, 'error')
+  } finally {
+    button.disabled = false
+  }
+})
+
+$('#btn-revoke-integration-key').addEventListener('click', async () => {
+  if (!confirm('Revogar a chave? Os fluxos do n8n deixarão de enviar mensagens até uma nova chave ser criada.')) return
+  try {
+    await api('/api/integrations/key', { method: 'DELETE' })
+    $('#integration-key-value').value = ''
+    $('#integration-key-reveal').classList.add('hidden')
+    renderN8nConfig({
+      keyConfigured: false,
+      n8nEnabled: $('#n8n-enabled').checked,
+      n8nWebhookUrl: $('#n8n-webhook-url').value.trim(),
+    })
+    notify('Chave de integração revogada.')
+  } catch (error) {
+    notify(error.message, 'error')
+  }
+})
+
+$('#btn-copy-integration-key').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('#integration-key-value').value)
+    notify('Chave copiada.')
+  } catch {
+    notify('Não foi possível copiar a chave.', 'error')
+  }
+})
 
 function renderWaSync(wa) {
   const sync = wa.sync || {}

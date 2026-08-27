@@ -1321,3 +1321,29 @@ input[type=text]:focus, input[type=tel]:focus, input[type=password]:focus, input
 .integration-endpoints { display: grid; gap: 12px; min-width: 0; }
 .integration-endpoints label { display: grid; gap: 6px; min-width: 0; color: var(--muted); font-size: .82rem; }
 .integration-endpoints code { display: block; min-width: 0; padding: 9px 11px; overflow-wrap: anywhere; border-radius: 10px; color: var(--text); background: var(--surface-soft, rgba(0,0,0,.04)); font-size: .78rem; line-height: 1.45; }
+.integration-config-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 22px; }
+.integration-panel { min-width: 0; padding: 18px; border: 1px solid var(--border); border-radius: 16px; background: rgba(255,255,255,.46); }
+.integration-panel h4 { margin: 5px 0 7px; }
+.integration-panel > p { min-height: 44px; margin: 0 0 16px; color: var(--muted); font-size: .86rem; line-height: 1.5; }
+.integration-panel > label:not(.sync-option) { display: grid; gap: 7px; color: var(--muted); font-size: .8rem; font-weight: 700; }
+.integration-panel input[type="url"] { margin: 0; }
+.n8n-toggle { margin: 13px 0; }
+.integration-key-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+.integration-key-reveal { margin-top: 14px; padding: 12px; border: 1px solid rgba(23,135,111,.28); border-radius: 12px; background: rgba(224,248,240,.65); }
+.integration-key-reveal > strong { display: block; margin-bottom: 9px; color: #146c59; font-size: .8rem; }
+.integration-key-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.integration-key-field input { min-width: 0; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .75rem; }
+.integration-key-field button { white-space: nowrap; }
+.n8n-guide { margin-top: 18px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 16px; background: rgba(255,255,255,.4); }
+.n8n-guide summary { color: var(--text); font-weight: 800; cursor: pointer; }
+.n8n-guide ol { margin: 14px 0; padding-left: 22px; color: var(--muted); font-size: .84rem; line-height: 1.8; }
+.n8n-guide pre { max-width: 100%; margin: 12px 0; padding: 14px; overflow: auto; border-radius: 12px; color: #d8f3ea; background: #123c35; font-size: .78rem; line-height: 1.55; }
+.n8n-guide p { margin: 12px 0 0; color: var(--muted); font-size: .84rem; line-height: 1.55; }
+.n8n-guide p code, .n8n-guide li code, .integration-panel p code { overflow-wrap: anywhere; }
+.integration-footnote { margin-top: 16px; }
+@media (max-width: 760px) {
+  .integration-config-grid { grid-template-columns: 1fr; }
+  .integration-panel > p { min-height: 0; }
+  .integration-key-field { grid-template-columns: 1fr; }
+  .integration-key-field button { width: 100%; }
+}

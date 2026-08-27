@@ -10,7 +10,7 @@
     "dev": "cd /Users/pedrosantos/.cache/robo-de-atendimento-runtime && node --watch src/index.js",
     "start:production": "node src/index.js",
     "test": "node --test",
-    "check": "node --check src/index.js && node --check src/server.js && node --check src/integration-core.js && node --check src/whatsapp-cloud.js"
+    "check": "node --check src/index.js && node --check src/server.js && node --check src/integration-core.js && node --check src/n8n-tenant.js && node --check src/whatsapp-cloud.js && node --check public/app.js"
   },
   "engines": {
     "node": ">=20"

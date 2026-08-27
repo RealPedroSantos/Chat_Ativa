@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import {
-  buildAutomationEvent, safeStringEqual, verifyWebhookChallenge, verifyWhatsAppSignature,
+  buildAutomationEvent, createIntegrationKey, hashIntegrationKey, integrationKeyFromRequest,
+  safeStringEqual, verifyWebhookChallenge, verifyWhatsAppSignature,
 } from '../src/integration-core.js'
 
 function withEnv(patch, callback) {
@@ -19,6 +20,18 @@ function withEnv(patch, callback) {
 test('segredos exigem conteúdo e tamanho iguais', () => {
   assert.equal(safeStringEqual('segredo-123', 'segredo-123'), true)
   assert.equal(safeStringEqual('segredo-123', 'segredo'), false)
+})
+
+test('chave gerada usa prefixo próprio e somente o hash precisa ser armazenado', () => {
+  const key = createIntegrationKey()
+  assert.match(key, /^cta_[A-Za-z0-9_-]{40,}$/)
+  assert.equal(hashIntegrationKey(key).length, 64)
+  assert.notEqual(hashIntegrationKey(key), key)
+})
+
+test('autenticação aceita Bearer ou x-api-key', () => {
+  assert.equal(integrationKeyFromRequest({ headers: { authorization: 'Bearer cta_abc' } }), 'cta_abc')
+  assert.equal(integrationKeyFromRequest({ headers: { 'x-api-key': 'cta_xyz' } }), 'cta_xyz')
 })
 
 test('desafio de verificação da Meta valida o token', () => {

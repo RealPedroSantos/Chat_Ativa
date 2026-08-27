@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 
 const DEFAULT_GRAPH_VERSION = 'v26.0'
 const DEFAULT_TIMEOUT_MS = 8_000
@@ -32,8 +32,20 @@ export function safeStringEqual(expected, provided) {
 export function isIntegrationRequestAuthorized(req) {
   const expected = env('CHAT_ATIVA_INTEGRATION_KEY')
   if (!expected) return false
-  const bearer = headerValue(req, 'authorization').replace(/^Bearer\s+/i, '')
-  return safeStringEqual(expected, headerValue(req, 'x-api-key') || bearer)
+  return safeStringEqual(expected, integrationKeyFromRequest(req))
+}
+
+export function integrationKeyFromRequest(req) {
+  const bearer = headerValue(req, 'authorization').replace(/^Bearer\s+/i, '').trim()
+  return String(headerValue(req, 'x-api-key') || bearer).trim()
+}
+
+export function hashIntegrationKey(value) {
+  return createHash('sha256').update(String(value || '')).digest('hex')
+}
+
+export function createIntegrationKey() {
+  return `cta_${randomBytes(32).toString('base64url')}`
 }
 
 export function integrationStatus() {

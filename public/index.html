@@ -95,14 +95,58 @@
           <div><span>WhatsApp Cloud API</span><strong id="cloud-api-status">Verificando…</strong></div>
           <div><span>Webhook da Meta</span><strong id="cloud-webhook-status">Verificando…</strong></div>
           <div><span>n8n</span><strong id="n8n-status">Verificando…</strong></div>
-          <div><span>Backend Chat Ativa</span><strong id="integration-backend-status">Verificando…</strong></div>
+          <div><span>Chave de integração</span><strong id="integration-backend-status">Verificando…</strong></div>
         </div>
         <div class="integration-endpoints">
           <label>Callback para cadastrar na Meta <code id="cloud-webhook-url"></code></label>
-          <label>Endpoint autenticado para enviar mensagens <code id="cloud-send-url"></code></label>
-          <label>Endpoint autenticado para disparar o n8n <code id="n8n-automation-url"></code></label>
+          <label>Endpoint que o n8n usa para enviar mensagens <code id="cloud-send-url"></code></label>
         </div>
-        <p class="muted">As credenciais ficam somente nas variáveis protegidas do ambiente. A conexão atual por QR continua disponível para instalações em servidor próprio.</p>
+        <div class="integration-config-grid">
+          <form id="n8n-config-form" class="integration-panel">
+            <span class="eyebrow">Mensagens recebidas</span>
+            <h4>Webhook do n8n</h4>
+            <p>Cole a <b>Production URL</b> do node Webhook. Toda nova mensagem recebida será enviada para esse fluxo.</p>
+            <label>Production URL do Webhook
+              <input id="n8n-webhook-url" type="url" placeholder="https://seu-n8n.com/webhook/atendimento" autocomplete="url" />
+            </label>
+            <label class="sync-option n8n-toggle">
+              <input id="n8n-enabled" type="checkbox" />
+              <span><b>Ativar envio de mensagens recebidas</b><small>Use o webhook de produção, não a URL de teste.</small></span>
+            </label>
+            <button type="submit">Salvar configuração do n8n</button>
+          </form>
+          <section class="integration-panel">
+            <span class="eyebrow">Autenticação</span>
+            <h4>Chat Ativa Integration Key</h4>
+            <p>Gere a chave usada pelo n8n no header <code>Authorization: Bearer</code>. Ela não depende da leitura do QR Code.</p>
+            <div class="integration-key-actions">
+              <button type="button" id="btn-generate-integration-key">Gerar chave</button>
+              <button type="button" id="btn-revoke-integration-key" class="danger hidden">Revogar chave</button>
+            </div>
+            <div id="integration-key-reveal" class="integration-key-reveal hidden" aria-live="polite">
+              <strong>Copie agora — a chave não será exibida novamente.</strong>
+              <div class="integration-key-field">
+                <input id="integration-key-value" type="text" readonly />
+                <button type="button" id="btn-copy-integration-key" class="secondary">Copiar</button>
+              </div>
+            </div>
+          </section>
+        </div>
+        <details class="n8n-guide" open>
+          <summary>Como configurar o node HTTP Request no n8n</summary>
+          <ol>
+            <li>Method: <code>POST</code></li>
+            <li>URL: <code id="n8n-send-guide-url"></code></li>
+            <li>Header: <code>Authorization</code> = <code>Bearer SUA_CHAVE</code></li>
+            <li>Body Content Type: <code>JSON</code></li>
+          </ol>
+          <pre><code>{
+  "to": "5511999999999",
+  "text": "Olá! Esta mensagem saiu pelo n8n."
+}</code></pre>
+          <p>Na entrada do Webhook, use <code>messages[0].from</code> para o telefone, <code>contacts[0].profile.name</code> para o nome e <code>messages[0].text.body</code> para o texto.</p>
+        </details>
+        <p class="muted integration-footnote">A mesma integração funciona com a conexão atual por QR Code e com a API oficial do WhatsApp.</p>
       </div>
     </section>
 
