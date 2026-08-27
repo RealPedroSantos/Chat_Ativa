@@ -1078,6 +1078,41 @@ export function getMessages(jid, limit = 100) {
     .map(publicMessage)
 }
 
+const deleteConversationsTransaction = db.transaction((tenantId, jids) => {
+  const placeholders = jids.map(() => '?').join(',')
+  const scoped = [tenantId, ...jids]
+  const existing = db.prepare(`
+    SELECT jid FROM contacts WHERE tenant_id = ? AND jid IN (${placeholders})
+  `).all(...scoped).map((row) => row.jid)
+  if (!existing.length) return { conversations: 0, messages: 0, jids: [], mediaPaths: [] }
+
+  const selectedPlaceholders = existing.map(() => '?').join(',')
+  const selected = [tenantId, ...existing]
+  const mediaPaths = db.prepare(`
+    SELECT DISTINCT media_path FROM messages
+    WHERE tenant_id = ? AND jid IN (${selectedPlaceholders})
+      AND media_path IS NOT NULL AND trim(media_path) <> ''
+  `).all(...selected).map((row) => row.media_path)
+
+  db.prepare(`DELETE FROM history_imports WHERE tenant_id = ? AND jid IN (${selectedPlaceholders})`).run(...selected)
+  db.prepare(`DELETE FROM internal_notes WHERE tenant_id = ? AND jid IN (${selectedPlaceholders})`).run(...selected)
+  db.prepare(`DELETE FROM conversation_cycles WHERE tenant_id = ? AND jid IN (${selectedPlaceholders})`).run(...selected)
+  db.prepare(`DELETE FROM smart_notes WHERE tenant_id = ? AND jid IN (${selectedPlaceholders})`).run(...selected)
+  db.prepare(`
+    DELETE FROM external_requests
+    WHERE tenant_id = ? AND (source_jid IN (${selectedPlaceholders}) OR target_jid IN (${selectedPlaceholders}))
+  `).run(tenantId, ...existing, ...existing)
+  const messages = db.prepare(`DELETE FROM messages WHERE tenant_id = ? AND jid IN (${selectedPlaceholders})`).run(...selected).changes
+  const conversations = db.prepare(`DELETE FROM contacts WHERE tenant_id = ? AND jid IN (${selectedPlaceholders})`).run(...selected).changes
+  return { conversations, messages, jids: existing, mediaPaths }
+})
+
+export function deleteConversations(jids = []) {
+  const unique = [...new Set(jids.map((jid) => String(jid || '').trim()).filter(Boolean))].slice(0, 1000)
+  if (!unique.length) return { conversations: 0, messages: 0, jids: [], mediaPaths: [] }
+  return deleteConversationsTransaction(currentTenantId(), unique)
+}
+
 export function updateMessageText(id, text) {
   return db.prepare("UPDATE messages SET text = ?, edited_at = datetime('now') WHERE tenant_id = ? AND id = ?")
     .run(String(text), currentTenantId(), Number(id))

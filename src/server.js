@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import {
   countUsers, createUser, deleteUser, getUserById, getUserByUsername, listUsers, updateUser, updateUserPassword,
   createTenant, deleteTenants, getTenant, listTenants, updateTenant,
-  deleteSetting, findTenantByIntegrationKeyHash, getSetting, getSettings, setSetting, updateSettings, getContact, listContacts, markContactRead, setContactPaused, getMessageMedia, getMessages, getMessageForAction, updateMessageText, deleteMessageRecord, upsertContact,
+  deleteSetting, findTenantByIntegrationKeyHash, getSetting, getSettings, setSetting, updateSettings, getContact, listContacts, markContactRead, setContactPaused, getMessageMedia, getMessages, getMessageForAction, updateMessageText, deleteMessageRecord, deleteConversations, upsertContact,
   createInternalMessage, createInternalNote, deleteInternalNote, deleteOwnInternalMessage, ensureOpenConversationCycle, updateOwnInternalMessage,
   getInternalMessageMedia, listInternalContacts, listInternalMessages, listInternalNotes,
   resolveConversation, transferConversation,
@@ -760,11 +760,30 @@ export function createServer() {
     res.setHeader('Content-Disposition', `inline; filename="${headerFileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`)
     res.sendFile(absolutePath)
   })
-  app.delete('/api/conversations/bulk', accountAdmin, (_req, res) => {
-    res.status(405).json({ error: 'Conversas de clientes são permanentes e não podem ser apagadas.' })
+  function removeConversationMedia(mediaPaths, tenantId) {
+    for (const mediaPath of mediaPaths || []) {
+      const absolutePath = resolveMediaPath(mediaPath, tenantId)
+      if (absolutePath) fs.rmSync(absolutePath, { force: true })
+    }
+  }
+
+  app.delete('/api/conversations/bulk', superOnly, (req, res) => {
+    const jids = Array.isArray(req.body?.jids) ? req.body.jids : []
+    if (!jids.length) return res.status(400).json({ error: 'Selecione pelo menos uma conversa.' })
+    if (jids.length > 1000) return res.status(400).json({ error: 'Selecione no máximo 1.000 conversas por vez.' })
+    const result = deleteConversations(jids)
+    removeConversationMedia(result.mediaPaths, req.tenantId)
+    for (const jid of result.jids) bus.emit('conversation_deleted', { tenantId: req.tenantId, jid })
+    res.json({ ok: true, conversations: result.conversations, messages: result.messages })
   })
-  app.delete('/api/conversations/:jid', accountAdmin, (_req, res) => {
-    res.status(405).json({ error: 'Conversas de clientes são permanentes e não podem ser apagadas.' })
+  app.delete('/api/conversations/:jid', superOnly, (req, res) => {
+    const jid = String(req.params.jid || '').trim()
+    if (!jid) return res.status(400).json({ error: 'Selecione uma conversa.' })
+    const result = deleteConversations([jid])
+    if (!result.conversations) return res.status(404).json({ error: 'Conversa não encontrada.' })
+    removeConversationMedia(result.mediaPaths, req.tenantId)
+    bus.emit('conversation_deleted', { tenantId: req.tenantId, jid })
+    res.json({ ok: true, conversations: result.conversations, messages: result.messages })
   })
   app.post('/api/send', auth, safe(async (req, res) => {
     const { jid, text } = req.body || {}

@@ -10,7 +10,7 @@ let CURRENT_USER = null
 let CURRENT_TENANT = null
 let TENANTS = []
 let currentWaState = null
-let lastWaSyncStatus = 'idle'
+let lastWaSyncStatus = null
 let activeMediaRecorder = null
 let activeAudioStream = null
 let recordingStartedAt = 0
@@ -38,13 +38,36 @@ function formatMessageText(text) {
     .replace(/(^|[\s(])\*([^*\n]+?)\*(?=$|[\s.,!?;:)])/g, '$1<strong>$2</strong>')
 }
 
-function notify(message, type = 'success') {
+function notify(message, type = 'success', duration = 4200) {
   const region = $('#toast-region')
+  if (type === 'message') $$('.toast.sync').forEach((toast) => toast.remove())
   const toast = document.createElement('div')
   toast.className = `toast ${type}`
-  toast.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="icons.svg#${type === 'error' ? 'i-alert' : 'i-check'}" /></svg><span>${esc(message)}</span>`
+  const icon = type === 'error' ? 'i-alert' : type === 'message' ? 'i-message' : 'i-check'
+  toast.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="icons.svg#${icon}" /></svg><span>${esc(message)}</span>`
   region.appendChild(toast)
-  setTimeout(() => toast.remove(), 4200)
+  setTimeout(() => toast.remove(), duration)
+}
+
+function incomingMessagePreview(message) {
+  const text = String(message?.text || '').replace(/\s+/g, ' ').trim()
+  if (text) return text.length > 110 ? `${text.slice(0, 107)}…` : text
+  const labels = {
+    audio: 'Enviou um áudio',
+    voice: 'Enviou uma mensagem de voz',
+    image: 'Enviou uma imagem',
+    video: 'Enviou um vídeo',
+    document: 'Enviou um documento',
+    sticker: 'Enviou uma figurinha',
+    gif: 'Enviou um GIF',
+  }
+  return labels[message?.message_type] || 'Enviou uma nova mensagem'
+}
+
+function notifyIncomingMessage(message) {
+  const contact = contacts.find((item) => item.jid === message?.jid)
+  const name = contact?.name || String(message?.jid || '').split('@')[0] || 'Novo contato'
+  notify(`Nova mensagem de ${name}: ${incomingMessagePreview(message)}`, 'message', 6500)
 }
 
 let calendarSoundEnabled = localStorage.getItem('calendar_sound_enabled') !== 'false'
@@ -587,8 +610,8 @@ function renderWaSync(wa) {
   $('#wa-sync-status').classList.toggle('complete', status === 'complete')
   $('#wa-sync-status').classList.toggle('error', status === 'error')
 
-  if (lastWaSyncStatus !== 'complete' && status === 'complete') {
-    notify(`Sincronização concluída: ${Number(sync.contactsImported || 0)} contatos e ${Number(sync.messagesImported || 0)} mensagens importadas.`)
+  if (['waiting_scan', 'syncing'].includes(lastWaSyncStatus) && status === 'complete') {
+    notify(`Sincronização concluída: ${Number(sync.contactsImported || 0)} contatos e ${Number(sync.messagesImported || 0)} mensagens importadas.`, 'sync')
     loadContacts()
     if ($('#tab-customers').classList.contains('active')) loadCustomers()
   }
@@ -671,7 +694,10 @@ function connectEvents() {
   es.addEventListener('wa_state', (e) => renderWaState(JSON.parse(e.data)))
   es.addEventListener('message', (e) => {
     const msg = JSON.parse(e.data)
-    if (msg.direction === 'in') playNotificationSound('received')
+    if (msg.direction === 'in') {
+      playNotificationSound('received')
+      notifyIncomingMessage(msg)
+    }
     else if (msg.source === 'human' || msg.author_user_id) playNotificationSound('sent')
     if (msg.jid === currentJid) {
       appendMessage(msg)
@@ -767,7 +793,7 @@ const selectedConversationJids = new Set()
 const selectedCustomerIds = new Set()
 
 function canDeleteConversations() {
-  return false
+  return CURRENT_USER?.role === 'super_admin'
 }
 
 function closeConversationContextMenu() {
@@ -832,15 +858,22 @@ function attachConversationGestures(element, contact) {
 }
 
 function updateConversationSelectionUi() {
-  conversationSelectionMode = selectedConversationJids.size > 0
   $('#conversation-selection-toolbar').classList.toggle('hidden', !conversationSelectionMode)
   $('#conversation-selection-count').textContent = selectedConversationJids.size
   renderContactList()
 }
 
 function toggleConversationSelection(jid) {
+  conversationSelectionMode = true
   if (selectedConversationJids.has(jid)) selectedConversationJids.delete(jid)
   else selectedConversationJids.add(jid)
+  updateConversationSelectionUi()
+}
+
+function startConversationSelection() {
+  if (!canDeleteConversations()) return
+  selectedConversationJids.clear()
+  conversationSelectionMode = true
   updateConversationSelectionUi()
 }
 
@@ -1314,6 +1347,9 @@ $('#chat-register-customer').addEventListener('click', async () => {
   $('#customer-form-title').textContent = 'Cadastrar contato da conversa'
   form.elements.name.focus()
 })
+
+$('#conversation-start-selection').addEventListener('click', startConversationSelection)
+$('#chat-delete-conversation').addEventListener('click', () => deleteConversationByJid(currentJid))
 
 async function deleteConversationByJid(jid) {
   if (!jid || !canDeleteConversations()) return

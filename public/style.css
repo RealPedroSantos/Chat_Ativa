@@ -282,6 +282,8 @@ label.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--pr
 .contacts-panel { display: flex; flex-direction: column; min-height: 0; padding: 13px; overflow: hidden; }
 .contacts-panel-heading { display: flex; align-items: flex-end; justify-content: space-between; min-height: 54px; padding: 0 8px 13px; }
 .contacts-panel-heading h2 { margin: 2px 0 0; font-size: 23px; letter-spacing: -.035em; }
+.contacts-panel-tools { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.contacts-panel-tools button { min-height: 28px; padding: 5px 8px; font-size: 9px; }
 .contacts-count { min-width: 28px; padding: 5px 8px; border-radius: 999px; color: #52706a; background: rgba(221,238,234,.76); font-size: 10px; font-weight: 800; text-align: center; }
 .contacts-count.unread { color: #fff; background: var(--primary); }
 .search-box { position: relative; display: flex; align-items: center; margin: 0 0 10px; color: #7b8798; }
@@ -630,6 +632,8 @@ label.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--pr
 .toast .ui-icon { width: 16px; height: 16px; flex: 0 0 16px; margin-top: 1px; }
 .toast.error { border-color: #f2c2c2; color: #9f3030; }
 .toast.success { border-color: #bfe7d8; color: #087454; }
+.toast.sync { border-color: #bfe7d8; color: #087454; }
+.toast.message { border-color: #9fd8cc; color: #075f51; background: rgba(240,253,249,.98); }
 .tenant-switcher { display: flex; align-items: center; gap: 7px; color: #c9d6e5; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 .tenant-switcher select { min-width: 170px; padding: 8px 30px 8px 10px; border-color: rgba(255,255,255,.2); color: #fff; background-color: rgba(255,255,255,.1); font-size: 12px; text-transform: none; letter-spacing: 0; }
 .tenant-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 18px; }
