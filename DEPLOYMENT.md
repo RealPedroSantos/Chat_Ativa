@@ -52,6 +52,9 @@ volume persistente ou em armazenamento criptografado.
 1. A Meta chama `https://chat-ativa.vercel.app/api/integrations/whatsapp/webhook`.
 2. A função valida `X-Hub-Signature-256` antes de aceitar o evento.
 3. O evento é entregue ao backend Chat Ativa e ao webhook do n8n.
-4. O n8n pode responder no próprio webhook ou chamar `/api/integrations/whatsapp/send` com `Authorization: Bearer <CHAT_ATIVA_INTEGRATION_KEY>`.
+4. Em **Conexão → WhatsApp Cloud API + n8n**, o administrador cadastra a Production URL do Webhook e gera a chave exclusiva da empresa.
+5. O n8n chama `/api/integrations/whatsapp/send` com `Authorization: Bearer <CHAVE_GERADA_NO_PAINEL>` e o JSON `{ "to": "5511999999999", "text": "Olá" }`.
+
+A chave gerada no painel funciona tanto com o canal atual por QR Code quanto com `WHATSAPP_CHANNEL=cloud_api`. Ela é exibida uma única vez e somente seu hash SHA-256 fica armazenado no backend. As variáveis `CHAT_ATIVA_INTEGRATION_KEY` e `N8N_WEBHOOK_URL` permanecem disponíveis apenas para integrações legadas e comunicação interna entre serviços.
 
 Faça primeiro um deploy de preview e teste `/api/integrations/status`. Depois promova o mesmo artefato para produção. Os valores secretos devem ser cadastrados diretamente no ambiente da Vercel e nunca enviados ao Git.
